@@ -150,7 +150,7 @@ def compute_gyroscope_stability(gyro_data, window_sec=0.5, fs=50):
     ).std()
     
     # Fill NaN with forward fill
-    gyro_stability = gyro_stability.fillna(method='ffill').fillna(0)
+    gyro_stability = gyro_stability.ffill().fillna(0)
     
     return gyro_magnitude.values, gyro_stability.values
 
