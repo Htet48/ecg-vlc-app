@@ -1,0 +1,11 @@
+streamlit
+numpy
+pandas
+matplotlib
+plotly
+scipy
+wfdb
+PyWavelets
+scikit-learn
+fastdtw
+
