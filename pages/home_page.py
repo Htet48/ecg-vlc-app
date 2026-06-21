@@ -180,15 +180,13 @@ Deep Learning:
     
     If you use this work, please cite:
     ```
-    Htet@Grace (2026). "Robust ECG Signal Reconstruction in Dynamic On-Body Visible Light Communication via Advanced Deep Learning". Master's Thesis.
+    Htet@Grace (2026). "Motion-Driven Markov Channel Modeling and Learning-Based Reconstruction for On-Body Optical Wireless ECG Transmission".
     ```
     """)
     
     # Contact
     st.info("""
-    **Questions or Feedback?**  
-    This is a thesis demonstration application. The complete methodology and 
-    results are available in the full thesis document.
+    **Questions or Feedback? Please contact to htetag414@gmail.com**  
     """)
 
 
