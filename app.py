@@ -17,6 +17,7 @@ import streamlit as st
 import numpy as np
 import sys
 import matplotlib
+import hmac
 from pathlib import Path
 
 # ── Force dark background for ALL matplotlib figures ──────────────────────
@@ -105,11 +106,99 @@ sys.path.append(str(Path(__file__).parent))
 
 # ── Page configuration ─────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="ECG-VLC Thesis Demo - Grace",
+    page_title="ECG-VLC Research - Grace",
     page_icon="🫀",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# =============================================================================
+# AUTHENTICATION SYSTEM
+# =============================================================================
+
+def check_password():
+    """Returns True if the user has correct credentials."""
+
+    def login_form():
+        st.markdown("""
+        <style>
+            .login-container {
+                max-width: 500px;
+                margin: 100px auto;
+                padding: 2rem;
+                background-color: #262730;
+                border-radius: 10px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            }
+            .login-title {
+                color: #4a9eff;
+                font-size: 2rem;
+                text-align: center;
+                margin-bottom: 1rem;
+            }
+            .login-subtitle {
+                color: #ffffff;
+                text-align: center;
+                margin-bottom: 2rem;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+
+        with st.container():
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                st.markdown('<div class="login-container">', unsafe_allow_html=True)
+                st.markdown('<h1 class="login-title">🫀 ECG-VLC Research Demo</h1>', unsafe_allow_html=True)
+                st.markdown('<p class="login-subtitle">ECG Signal Reconstruction through VLC</p>', unsafe_allow_html=True)
+
+                with st.form("credentials_form"):
+                    st.text_input("👤 Username", key="username", placeholder="Enter your username")
+                    st.text_input("🔒 Password", type="password", key="password", placeholder="Enter your password")
+                    col_a, col_b, col_c = st.columns([1, 2, 1])
+                    with col_b:
+                        submitted = st.form_submit_button("🚀 Login", use_container_width=True)
+                    if submitted:
+                        password_entered()
+
+                st.markdown("---")
+                st.info("""
+                **Author:** Htet@Grace
+                **Topic:** Motion-Driven Markov Channel Modeling and Learning-Based Reconstruction for On-Body Optical Wireless ECG Transmission
+                **Innovation:** Motion-aware VLC channel with IMU-learned Markov models
+                """)
+                st.caption("📧 For access credentials, please contact: htetag414@gmail.com")
+                st.markdown('</div>', unsafe_allow_html=True)
+
+    def password_entered():
+        username = st.session_state["username"]
+        password = st.session_state["password"]
+        if "passwords" in st.secrets and username in st.secrets["passwords"]:
+            if hmac.compare_digest(password, st.secrets["passwords"][username]):
+                st.session_state["password_correct"] = True
+                st.session_state["logged_in_user"] = username
+                if "user_names" in st.secrets and username in st.secrets["user_names"]:
+                    st.session_state["user_display_name"] = st.secrets["user_names"][username]
+                else:
+                    st.session_state["user_display_name"] = username
+                del st.session_state["password"]
+                del st.session_state["username"]
+            else:
+                st.session_state["password_correct"] = False
+        else:
+            st.session_state["password_correct"] = False
+
+    if st.session_state.get("password_correct", False):
+        return True
+
+    login_form()
+    if "password_correct" in st.session_state and not st.session_state["password_correct"]:
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.error("❌ Incorrect username or password. Please try again.")
+    return False
+
+if not check_password():
+    st.stop()
 
 # ── Dark CSS theme — comprehensive override ───────────────────────────────
 st.markdown("""
@@ -199,7 +288,18 @@ if 'ambient' not in st.session_state:
 # SIDEBAR
 # =============================================================================
 
-st.sidebar.markdown("# 🫀 ECG-VLC Thesis Demo")
+st.sidebar.markdown("# 🫀 ECG-VLC Research Demo")
+
+# Show logged-in user
+if "user_display_name" in st.session_state:
+    st.sidebar.success(f"✅ Logged in as: **{st.session_state['user_display_name']}**")
+
+# Logout button
+if st.sidebar.button("🚪 Logout", use_container_width=True):
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+    st.rerun()
+
 st.sidebar.markdown("---")
 
 # Navigation
@@ -239,15 +339,15 @@ st.sidebar.caption(
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
-**Thesis:** ECG Signal Reconstruction through VLC
+**Research:** ECG Signal Reconstruction through VLC
 
-**Student:** Grace  
+**Author:** Grace
 **Year:** 2026
 
 **Key Innovation:**
 Motion-aware VLC channel using IMU-learned Markov models
 
-**Noise Model:** Physical photodetector characteristics  
+**Noise Model:** Physical photodetector characteristics
 (Thermal + shot noise based on ambient lighting)
 """)
 

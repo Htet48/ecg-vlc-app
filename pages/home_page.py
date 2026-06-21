@@ -15,9 +15,9 @@ def show_home():
                 unsafe_allow_html=True)
     
     st.markdown("""
-    ## Master's Thesis Demonstration - Htet@Grace (2026)
-    
-    Welcome to the interactive demonstration of my thesis work on **Robust ECG Signal Reconstruction in Dynamic On-Body Visible Light Communication via Advanced Deep Learning** with **motion-aware channel modeling**.
+    ## Research Demonstration - Htet@Grace (2026)
+
+    Welcome to the interactive demonstration of my research on **Robust ECG Signal Reconstruction in Dynamic On-Body Visible Light Communication via Advanced Deep Learning** with **motion-aware channel modeling**.
     """)
     
     st.markdown("---")
