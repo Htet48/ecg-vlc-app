@@ -93,7 +93,7 @@ def show_pipeline_explained():
 
 def show_dataset_generation():
     st.markdown('<div class="main-header">📊 VLC-ECG Dataset Generation Pipeline</div>', unsafe_allow_html=True)
-
+    
     st.markdown("""
     **Complete pipeline: ECG → ACO-OFDM → VLC Channel → Reconstruction**
 
@@ -106,18 +106,18 @@ def show_dataset_generation():
 
     # Show system diagram
     show_system_overview()
-
+    
     st.markdown("---")
-
+    
     # =============================================================================
     # STEP 1: ECG LOADING & PREPROCESSING
     # =============================================================================
-
+    
     st.markdown("## 📥 Step 1: ECG Data Preparation")
-
+    
     with st.expander("Load MIT-BIH ECG Record", expanded=False):
         col1, col2, col3 = st.columns([2, 1, 1])
-
+        
         with col1:
             available_records = [
                 '100', '101', '103', '105', '106', '108', '109',
@@ -127,35 +127,35 @@ def show_dataset_generation():
                 '208', '209', '210', '212', '213'
             ]
             record_id = st.selectbox("Record:", available_records, index=0)
-
+        
         with col2:
             duration = st.slider("Duration (s):", 10, 300, 60, step=10)
-
+        
         with col3:
             sampfrom = st.number_input("Start:", 0, 10000, 0, step=1000)
-
+        
         if st.button("📥 Load ECG", type="primary"):
             with st.spinner("Loading..."):
                 try:
                     ecg_raw, fs, _ = load_mitbih_record(record_id, duration, sampfrom)
-
+                    
                     if ecg_raw is not None and len(ecg_raw) > 0:
                         # Preprocess to 3-second segments (1080 samples @ 360 Hz)
                         segments, r_peaks, _ = preprocess_ecg(ecg_raw, fs=fs, target_window=1080)
-
+                        
                         if len(segments) > 0:
                             st.session_state['ecg_clean'] = segments[0]
                             st.session_state['record_id'] = record_id
                             st.session_state['all_segments'] = segments
-
+                            
                             # Calculate heart rate
                             if len(r_peaks) > 1:
                                 rr_intervals = np.diff(r_peaks) / fs
                                 hr = 60 / np.mean(rr_intervals)
                                 st.session_state['heart_rate'] = hr
-
+                            
                             st.success(f"✅ Loaded: {len(segments)} segments × 1080 samples (3 sec each)")
-
+                            
                             # Visualize
                             fig = go.Figure()
                             fig.add_trace(go.Scatter(
@@ -166,7 +166,7 @@ def show_dataset_generation():
                             fig.update_layout(
                                 title=f"Record {record_id}: Clean ECG Segment",
                                 xaxis_title="Sample", yaxis_title="Amplitude",
-                                height=300, template='plotly_dark', showlegend=False
+                                height=300, template='plotly_white', showlegend=False
                             )
                             st.plotly_chart(fig, use_container_width=True)
                         else:
@@ -175,35 +175,35 @@ def show_dataset_generation():
                         st.error("Failed to load ECG")
                 except Exception as e:
                     st.error(f"Error: {e}")
-
+    
     if 'ecg_clean' not in st.session_state:
         st.info("👆 Please load ECG data first")
         return
-
+    
     st.markdown("---")
-
+    
     # =============================================================================
     # STEP 2: ACTIVITY & PARAMETERS
     # =============================================================================
-
+    
     st.markdown("## ⚙️ Step 2: Activity Selection & Parameters")
-
+    
     col1, col2 = st.columns(2)
-
+    
     with col1:
         activity = st.selectbox(
             "Activity:",
             ['walking', 'sitting', 'standing'],
             help="Determines IMU-learned channel parameters"
         )
-
+    
     with col2:
         param_source = st.radio(
             "Parameter Source:",
             ['Learned (IMU)', 'Pre-calculated'],
             help="Use real IMU-learned or pre-calculated parameters"
         )
-
+    
     # Get parameters
     if param_source == 'Learned (IMU)' and 'all_activity_results' in st.session_state:
         # Use learned parameters from IMU analysis
@@ -231,7 +231,7 @@ def show_dataset_generation():
         beta = BETA_DIFFUSE[activity]
         attenuation_to_use = ATTENUATION_DB  # Use default full dict
         param_used = "PRE-CALCULATED"
-
+    
     # Show parameters compactly
     with st.expander("View Channel Parameters", expanded=False):
         # Show parameter source
@@ -239,15 +239,15 @@ def show_dataset_generation():
             st.success(f"✅ Using **{param_used}** parameters")
         else:
             st.info(f"ℹ️ Using **{param_used}** parameters")
-
+        
         col1, col2 = st.columns(2)
-
+        
         with col1:
             st.markdown("**Markov Matrix P:**")
             _labels = ['LoS-dominant', 'Partially-obstructed', 'Diffuse-dominant']
             df_P = pd.DataFrame(P, columns=_labels, index=_labels)
             st.dataframe(df_P.style.format("{:.3f}"))
-
+        
         with col2:
             st.markdown("**Parameters:**")
             # ✅ FIX: Extract activity-specific attenuation for display
@@ -261,7 +261,7 @@ Attenuation (dB):
   Partially-obstructed (1): {att_display[1]}
   Diffuse-dominant (2):    {att_display[2]}
             """)
-
+    
     # Modulation parameters
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -270,38 +270,38 @@ Attenuation (dB):
         cp_length = st.selectbox("CP Length:", [32, 64, 128], index=1)
     with col3:
         qam_order = st.selectbox("QAM Order:", [4, 16], index=0)
-
+    
     st.markdown("---")
-
+    
     # =============================================================================
     # STEP 3: EXECUTE PIPELINE
     # =============================================================================
-
+    
     st.markdown("## 🚀 Step 3: Execute Transmission Pipeline")
-
+    
     if st.button("▶️ Run Complete Pipeline", type="primary", use_container_width=True):
-
+        
         ecg_clean = st.session_state['ecg_clean']
         aco = ACO_OFDM_VLC(N=fft_size, cp_len=cp_length, M=qam_order)
         rng = np.random.default_rng()
         results = {}
-
+        
         # =====================================================================
         # STAGE A: ACO-OFDM MODULATION
         # =====================================================================
-
+        
         with st.expander("📤 Stage A: ACO-OFDM Modulation", expanded=True):
             st.markdown("**Transmitter: ECG → Optical Signal**")
-
+            
             # Modulation steps
             bits_tx = aco.ecg_to_bits(ecg_clean, bit_depth=8)
             symbols_tx = aco.bits_to_symbols(bits_tx)
             s_t, n_blocks = aco.aco_ofdm_modulate(symbols_tx)
-
+            
             results['s_t'] = s_t
             results['bits_tx'] = bits_tx
             results['symbols_tx'] = symbols_tx
-
+            
             st.code(f"""
 Pipeline: ECG → Bits → QAM Symbols → ACO-OFDM
 
@@ -314,7 +314,7 @@ ACO-OFDM: Hermitian symmetry + clipping → real, non-negative signal
   CORRECTED: only the N/4 positive-frequency odd subcarriers carry data
   (the negative-frequency odd carriers are conjugate mirrors — no new data)
             """)
-
+            
             # Plot
             fig = go.Figure()
             fig.add_trace(go.Scatter(y=s_t[:1000], mode='lines',
@@ -322,21 +322,21 @@ ACO-OFDM: Hermitian symmetry + clipping → real, non-negative signal
             fig.update_layout(
                 title="Transmitted Signal s(t)",
                 xaxis_title="Sample", yaxis_title="Amplitude",
-                height=250, template='plotly_dark', showlegend=False
+                height=250, template='plotly_white', showlegend=False
             )
             st.plotly_chart(fig, use_container_width=True)
-
+        
         # =====================================================================
         # STAGE B: MARKOV STATE GENERATION
         # =====================================================================
-
+        
         with st.expander("🎯 Stage B: Generate Channel States (IMU-based)", expanded=True):
             st.markdown("**Key Innovation: IMU-learned Markov model**")
-
+            
             # Generate states
             states = generate_markov_states(P, len(s_t), rng)
             results['states'] = states
-
+            
             st.code(f"""
 Markov Chain: P(st+1 | st) — IMU-informed motion-conditioned surrogate model
 
@@ -352,7 +352,7 @@ Markov Chain: P(st+1 | st) — IMU-informed motion-conditioned surrogate model
 
   Transitions: {np.sum(np.diff(states) != 0)} state changes
             """)
-
+            
             # Plot
             fig = go.Figure()
             fig.add_trace(go.Scatter(y=states[:1000], mode='lines',
@@ -360,18 +360,19 @@ Markov Chain: P(st+1 | st) — IMU-informed motion-conditioned surrogate model
             fig.update_layout(
                 title="Markov State Sequence (0=LoS-dominant, 1=Partially-obstructed, 2=Diffuse-dominant)",
                 xaxis_title="Sample", yaxis_title="State",
-                height=250, template='plotly_dark',
+                height=250, template='plotly_white',
+        font=dict(color="#111111"),
                 yaxis=dict(tickvals=[0,1,2]), showlegend=False
             )
             st.plotly_chart(fig, use_container_width=True)
-
+        
         # =====================================================================
         # STAGE C: VLC CHANNEL MODEL
         # =====================================================================
-
+        
         with st.expander("📡 Stage C: VLC Channel Transformation", expanded=True):
             st.markdown("**Complete channel model: 8 components**")
-
+            
             st.latex(
                 r"r(t) = \left[\eta^{\mathrm{dir}}_{a_t} H_0 g(a_t)\xi(t)s(t)"
                 r"+ \eta^{\mathrm{diff}}_{a_t}\beta\, h_{\mathrm{eff}}(t)*s(t)\right]_{\mathrm{LED}} + n(t)"
@@ -381,48 +382,48 @@ Markov Chain: P(st+1 | st) — IMU-informed motion-conditioned surrogate model
                 "balance per channel state (LoS-dominant → η_dir=0.95; Diffuse-dominant → η_diff=0.80). "
                 "τ_eff = 15 ms is an effective signal-level memory constant, not a physical optical propagation delay."
             )
-
+            
             # C1: State attenuation
             st.markdown("**C1. State-Dependent Attenuation g(aₜ)**")
             g_state = compute_state_attenuation(states, activity, attenuation_to_use, rng)
             results['g_state'] = g_state
-
+            
             st.code(f"""
 g(aₜ) = 10^(AttdB/20)
   where aₜ = Markov state (LoS/Partial/NLoS)
         AttdB = attenuation in dB, learned from IMU motion
-
+  
   Result: g ∈ [{g_state.min():.4f}, {g_state.max():.4f}], mean={g_state.mean():.4f}
             """)
-
+            
             # C2: Log-normal jitter
             st.markdown("**C2. Log-Normal Jitter ξ(t)**")
             xi = compute_lognormal_jitter(len(s_t), sigma, rng)
             results['xi'] = xi
-
+            
             st.code(f"""
 ξ(t) = exp(ν), ν ~ N(-σ²/2, σ²)
   where σ = {sigma:.4f} (jitter parameter from IMU)
         ν = log-normal random variable (zero-mean)
-
+  
   Result: E[ξ]={xi.mean():.4f} ≈ 1.0 (unbiased), Std={xi.std():.4f}
             """)
-
+            
             # C3: Lambertian channel
             st.markdown("**C3. Lambertian Channel H₀(t)**")
             H0 = compute_lambertian_channel(len(s_t), 360, activity, rng)
             results['H0'] = H0
-
+            
             st.code(f"""
 H₀(t) = (m+1)A/(2πd²) · cos^m(φ) · cos(ψ)
   where m = 1 (Lambertian order for standard LED)
         A = photodetector area, d = distance
         φ(t) = irradiance angle, ψ(t) = incidence angle
         (angles vary with body motion)
-
+  
   Result: E[H₀]={H0.mean():.4f} ≈ 1.0 (normalized for stability)
             """)
-
+            
             # C4-C6: State-dependent direct + diffuse combination
             st.markdown("**C4-C6. State-Dependent Direct + Diffuse Paths**")
             direct  = H0 * g_state * xi * s_t
@@ -452,12 +453,12 @@ C6  Combined (state-dependent):
       r_combined(t) = η_dir[aₜ] · direct + η_diff[aₜ] · diffuse
       → weights vary per sample according to Markov state aₜ
             """)
-
+            
             # C7: LED nonlinearity
             st.markdown("**C7. LED Nonlinearity**")
             led_out = apply_led_nonlinearity(combined)
             results['led_out'] = led_out
-
+            
             st.code(f"""
 y_LED = clip( a₁·x + a₃·x³ ,  0, Pmax )
   where a₁ = 1.0   (linear gain)
@@ -467,27 +468,27 @@ y_LED = clip( a₁·x + a₃·x³ ,  0, Pmax )
   Soft compression followed by hard clipping models LED saturation correctly.
   NOTE: a₃ must be NEGATIVE; a positive value would expand the signal (wrong).
             """)
-
+            
             # C8: Noise
             st.markdown("**C8. Noise Addition**")
             r_t = add_noise(led_out, 'bright', rng)
             results['r_t'] = r_t
-
+            
             # Calculate optical SNR (physical layer)
             signal_power = np.mean(led_out ** 2)
             noise_power = np.mean((r_t - led_out) ** 2)
             optical_snr_db = 10 * np.log10(signal_power / (noise_power + 1e-10))
-
+            
             st.code(f"""
 n(t) = n_thermal + n_shot
   where n_thermal = thermal noise from photodetector
         n_shot = shot noise from ambient light
-
+  
   Optical SNR = {optical_snr_db:.2f} dB (physical layer, before demodulation)
   Note: This is NOT end-to-end SNR. After demodulation, effective
         SNR ≈ dB due to ACO-OFDM distortion & bit errors.
             """)
-
+            
             # Plot received signal
             fig = go.Figure()
             fig.add_trace(go.Scatter(y=r_t[:1000], mode='lines',
@@ -495,40 +496,42 @@ n(t) = n_thermal + n_shot
             fig.update_layout(
                 title="Received Signal r(t) after VLC Channel",
                 xaxis_title="Sample", yaxis_title="Amplitude",
-                height=250, template='plotly_dark', showlegend=False
+                height=250, template='plotly_white', showlegend=False
             )
             st.plotly_chart(fig, use_container_width=True)
-
+        
         # =====================================================================
         # STAGE D: DEMODULATION
         # =====================================================================
-
+        
         with st.expander("📥 Stage D: ACO-OFDM Demodulation", expanded=True):
             st.markdown("**Receiver: Optical Signal → Reconstructed ECG**")
-
+            
             # Demodulation
             rx_symbols = aco.aco_ofdm_demodulate(r_t, n_blocks)
             rx_bits = aco.symbols_to_bits(rx_symbols[:len(symbols_tx)])
             ecg_recon = aco.bits_to_ecg(rx_bits, 1080)
-
+            
             results['ecg_recon'] = ecg_recon
-
+            
             # Calculate BER and PRD
             ber = np.sum(bits_tx[:len(rx_bits)] != rx_bits) / len(rx_bits)
-
+            
             # PRD
             min_len = min(len(ecg_clean), len(ecg_recon))
             prd = 100 * np.sqrt(np.mean((ecg_clean[:min_len] - ecg_recon[:min_len])**2)) / \
                   np.sqrt(np.mean(ecg_clean[:min_len]**2))
-
+            
             # Signal Quality SNR (Application Layer)
+            # Uses RECEIVED signal power (r(t) quality at RX end)
+            # Standard in biomedical signal processing
             ecg_rx_power = np.mean(ecg_recon[:min_len] ** 2)
             ecg_error_power = np.mean((ecg_clean[:min_len] - ecg_recon[:min_len]) ** 2)
             signal_quality_snr_db = 10 * np.log10(ecg_rx_power / (ecg_error_power + 1e-10))
-
+            
             # Create metrics display with clear relationship
             st.markdown("#### 📊 Performance Metrics (Application Layer)")
-
+            
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.metric("Raw/Uncoded BER", f"{ber*100:.2f}%",
@@ -543,7 +546,7 @@ n(t) = n_thermal + n_shot
             with col3:
                 st.metric("Signal Quality SNR", f"{signal_quality_snr_db:.2f} dB",
                          help="Received signal quality: r(t) at RX end")
-
+            
             st.code(f"""
 *** APPLICATION LAYER: Signal Quality Assessment ***
 
@@ -551,54 +554,54 @@ Measures: Received ECG quality (r(t) at RX end)
 
  Raw BER = {ber*100:6.2f}%  ← Raw/uncoded BER after ACO-OFDM demodulation
              (high BER expected — characterises channel severity before FEC)
- PRD  = {prd:6.2f}%  ← Waveform distortion
+ PRD  = {prd:6.2f}%  ← Waveform distortion  
  SNR  = {signal_quality_snr_db:6.2f} dB ← Received signal quality (r(t))
 
-Formula:
-  Signal power = mean(r(t)²)     = {ecg_rx_power:.6f}
+Formula:                                    
+  Signal power = mean(r(t)²)     = {ecg_rx_power:.6f}   
   Error power  = mean((x-r(t))²) = {ecg_error_power:.6f}
-  SNR = 10 × log₁₀(signal / error)
+  SNR = 10 × log₁₀(signal / error)         
 
-Relationship:
+Relationship:                               
   High BER ({ber*100:.1f}%) → High PRD ({prd:.1f}%) → Low SNR ({signal_quality_snr_db:.1f} dB)
 
 
 *** PHYSICAL LAYER: Optical Channel Quality ***
 
- Optical SNR = {optical_snr_db:.2f} dB (photodetector signal quality)
+ Optical SNR = {optical_snr_db:.2f} dB (photodetector signal quality)   
 
-Why different from Signal Quality SNR?
-  • Optical SNR: Physical layer (before demodulation)
+Why different from Signal Quality SNR?     
+  • Optical SNR: Physical layer (before demodulation)  
   • Signal Quality SNR: Application layer (after full pipeline)
   • Gap = {optical_snr_db - signal_quality_snr_db:.2f} dB loss from OFDM + quantization + BER
 
-Both metrics important:
-  ✓ Optical SNR validates VLC channel model
+Both metrics important:                     
+  ✓ Optical SNR validates VLC channel model 
   ✓ Signal Quality SNR evaluates clinical usability
             """)
-
+            
             # Compare original vs reconstructed
             fig = make_subplots(
                 rows=2, cols=1,
                 subplot_titles=("Original ECG", "Received ECG (After VLC Channel)"),
                 vertical_spacing=0.12
             )
-
+            
             fig.add_trace(go.Scatter(y=ecg_clean, mode='lines',
                                     line=dict(color='#2ecc71', width=1.5),
                                     name='Original'), row=1, col=1)
-
+            
             fig.add_trace(go.Scatter(y=ecg_recon, mode='lines',
                                     line=dict(color='#e67e22', width=1.5),
                                     name='Reconstructed'), row=2, col=1)
-
+            
             fig.update_xaxes(title_text="Sample", row=2, col=1)
             fig.update_yaxes(title_text="Amplitude", row=1, col=1)
             fig.update_yaxes(title_text="Amplitude", row=2, col=1)
-
-            fig.update_layout(height=500, template='plotly_dark', showlegend=True)
+            
+            fig.update_layout(height=500, template='plotly_white', showlegend=True)
             st.plotly_chart(fig, use_container_width=True)
-
+            
             # Quality assessment (described as signal-fidelity proxy, not clinical validation)
             if prd < 9:
                 st.success(f"✅ Signal fidelity proxy (PRD={prd:.2f}% < 9%) — diagnostic-preservation threshold")
@@ -649,6 +652,10 @@ Both metrics important:
         )
 
         # ── Canonical sensitivity from metadata.json ──────────────────────────
+        # Read the precomputed sensitivity (same source as the Sensitivity
+        # Analysis page and the report) so every surface shows IDENTICAL values
+        # — a single, full-dataset-aligned source of truth. The previous live
+        # single-segment computation has been removed to avoid divergent numbers.
         import json as _json
         _meta_path = Path('datasets/thesis_dataset/metadata.json')
         _w = {'walking': 0.4, 'sitting': 0.3, 'standing': 0.3}   # activity mix
@@ -670,6 +677,10 @@ Both metrics important:
                 _ber = sum(_w[a] * cells[a]['ber'] for a in acts) * 100
                 _snr = sum(_w[a] * cells[a]['sq_snr'] for a in acts)
                 _prd = sum(_w[a] * cells[a].get('prd', 0.0) for a in acts)
+                # 200-segment robustness subsample (degraded ECG, before reconstruction).
+                # Activity-weighted 40/30/30 per scenario. BER reconciles with the
+                # full dataset; absolute SQ-SNR/PRD are subsample values (headline
+                # absolutes are the full-dataset values in the main results).
                 sens_rows.append({
                     'Scenario':    _lab[_sc],
                     'Conditions':  _desc[_sc],
@@ -700,7 +711,8 @@ Both metrics important:
         df_sens = pd.DataFrame(sens_rows)
         st.dataframe(df_sens, use_container_width=True, hide_index=True)
 
-        # Single BER bar chart
+        # Single BER bar chart (the robustness metric). Absolute SQ-SNR/PRD are
+        # the headline full-dataset values (main results), not shown here.
         if sens_rows:
             colors_s = ['#2ecc71', '#3498db', '#e74c3c'][:len(sens_rows)]
             fig_ber = go.Figure()
@@ -714,7 +726,7 @@ Both metrics important:
             fig_ber.update_layout(
                 title="Raw/Uncoded BER (%) per Scenario",
                 yaxis_title='BER (%)', height=350,
-                template='plotly_dark', showlegend=False,
+                template='plotly_white', showlegend=False,
                 yaxis=dict(range=[0, 14])
             )
             st.plotly_chart(fig_ber, use_container_width=True)
@@ -741,21 +753,21 @@ Both metrics important:
 
 def show_system_overview():
     """Show concise system diagram"""
-
+    
     st.markdown("""
     ```
-    *** VLC-ECG TRANSMISSION SYSTEM ***
+    *** VLC-ECG TRANSMISSION SYSTEM ***   
 
-
+                                                     
   ECG(t) → ACO-OFDM → s(t) → [VLC Channel] → r(t) → Demod → ECG'
              TX              IMU-learned             RX
-                             Markov model
-
-  Channel Components:
-    • State attenuation g(aₜ)  • Jitter ξ(t)
-    • Lambertian H₀(t)         • Diffuse path
-    • LED nonlinearity         • Noise n(t)
-
+                             Markov model            
+                                                     
+  Channel Components:                                
+    • State attenuation g(aₜ)  • Jitter ξ(t)       
+    • Lambertian H₀(t)         • Diffuse path       
+    • LED nonlinearity         • Noise n(t)         
+                                                     
   Key Innovation: Activity-specific parameters from IMU data
 
     ```

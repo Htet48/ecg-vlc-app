@@ -201,8 +201,56 @@ def compute_r_peak_detection_accuracy(original, reconstructed, fs=360):
             matched += 1
     
     detection_rate = 100 * matched / len(peaks_orig)
-    
+
     return detection_rate
+
+
+# ±5-sample tolerance (~14 ms at 360 Hz) — revised per Reviewer 3, C#6.
+# Tightened from the previous ±50 ms window for clinically rigorous beat scoring.
+BEAT_TOL_SAMPLES = 5
+
+
+def compute_beat_metrics(original, reconstructed, fs=360, tol=BEAT_TOL_SAMPLES):
+    """
+    Beat-level detection metrics with a ±tol-sample tolerance window
+    (Reviewer 3, C#6). Returns Sensitivity, PPV, F1 (%) and MATE (ms).
+
+        Sensitivity = TP / (TP + FN)   — recall / R-peak detection rate
+        PPV         = TP / (TP + FP)   — precision / no false alarms
+        F1          = 2·TP / (2·TP + FP + FN)
+        MATE        = mean absolute timing error of matched beats (ms)
+
+    A matched pair must be within ±tol samples (default ±5 ≈ 14 ms at 360 Hz),
+    and each reconstructed peak can match at most one reference peak.
+    """
+    po = detect_r_peaks_simple(original, fs)
+    pr = detect_r_peaks_simple(reconstructed, fs)
+
+    if len(po) == 0 or len(pr) == 0:
+        return {'sensitivity': np.nan, 'ppv': np.nan, 'f1': np.nan, 'mate_ms': np.nan}
+
+    tp, timing_errors, matched = 0, [], set()
+    for p in po:
+        dists = np.abs(pr - p)
+        idx = int(np.argmin(dists))
+        if dists[idx] <= tol and idx not in matched:
+            tp += 1
+            matched.add(idx)
+            timing_errors.append(dists[idx] / fs * 1000.0)
+
+    fn = len(po) - tp
+    fp = len(pr) - tp
+    sensitivity = tp / (tp + fn + 1e-10)
+    ppv = tp / (tp + fp + 1e-10)
+    f1 = 2 * tp / (2 * tp + fp + fn + 1e-10)
+    mate_ms = float(np.mean(timing_errors)) if timing_errors else np.nan
+
+    return {
+        'sensitivity': float(sensitivity * 100),
+        'ppv':         float(ppv * 100),
+        'f1':          float(f1 * 100),
+        'mate_ms':     mate_ms,
+    }
 
 
 def compute_rr_interval_quality(original, reconstructed, fs=360):
@@ -334,11 +382,17 @@ def compute_comprehensive_metrics(original, reconstructed, fs=360):
     
     # 3. Diagnostic
     r_peak_acc = compute_r_peak_detection_accuracy(original, reconstructed, fs)
+    beat = compute_beat_metrics(original, reconstructed, fs)
     rr_quality = compute_rr_interval_quality(original, reconstructed, fs)
     hrv_metrics = compute_hrv_preservation(original, reconstructed, fs)
-    
+
     metrics['diagnostic'] = {
         'r_peak_detection_percent': r_peak_acc,
+        # Beat-level metrics with ±5-sample tolerance (Reviewer 3, C#6)
+        'sensitivity_percent': beat['sensitivity'],
+        'ppv_percent': beat['ppv'],
+        'f1_percent': beat['f1'],
+        'mate_ms': beat['mate_ms'],
         'rr_mae_ms': rr_quality['rr_mae_ms'],
         'rr_quality': rr_quality['rr_quality'],
         'sdnn_error': hrv_metrics['sdnn_error_bpm'],
@@ -398,8 +452,13 @@ def format_metrics_for_display(metrics):
     
     # Diagnostic
     diag = metrics['diagnostic']
+    def _fmt(v, suf=''):
+        return 'N/A' if v is None or (isinstance(v, float) and np.isnan(v)) else f"{v:.2f}{suf}"
     display['Diagnostic'] = {
-        'R-Peak Detection (%)': f"{diag['r_peak_detection_percent']:.2f}",
+        'R-Peak Sensitivity (%)': _fmt(diag.get('sensitivity_percent')),
+        'PPV / Precision (%)': _fmt(diag.get('ppv_percent')),
+        'F1-score (%)': _fmt(diag.get('f1_percent')),
+        'MATE (ms)': _fmt(diag.get('mate_ms')),
         'R-R MAE (ms)': f"{diag['rr_mae_ms']:.2f}",
         'R-R Quality': diag['rr_quality'],
         'HRV Quality': diag['hrv_quality']

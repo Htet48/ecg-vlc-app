@@ -150,7 +150,7 @@ def compute_gyroscope_stability(gyro_data, window_sec=0.5, fs=50):
     ).std()
     
     # Fill NaN with forward fill
-    gyro_stability = gyro_stability.ffill().fillna(0)
+    gyro_stability = gyro_stability.fillna(method='ffill').fillna(0)
     
     return gyro_magnitude.values, gyro_stability.values
 
@@ -369,12 +369,15 @@ def learn_attenuation_parameters(dynamic_acc_mag, states):
             min_att = base_att - (motion_factor * (motion_90th - motion_mean))
             max_att = base_att + (motion_factor * (motion_mean - motion_10th))
             
-            attenuation_dict[state] = (float(min_att), float(max_att))
+            # Ensure lower bound ≤ upper bound (Reviewer 4 C#1 / Table 14 fix)
+            lo = float(min(min_att, max_att))
+            hi = float(max(min_att, max_att))
+            attenuation_dict[state] = (lo, hi)
         else:
-            # Fallback for insufficient data
+            # Fallback for insufficient data — ordered intervals guaranteed
             fallback = {0: (-0.5, -0.1), 1: (-2.5, -1.5), 2: (-3.5, -2.0)}
             attenuation_dict[state] = fallback[state]
-    
+
     return attenuation_dict
 
 def learn_jitter_parameter(gyro_stability):
@@ -485,10 +488,10 @@ def analyze_single_activity(imu_data, activity_name):
     # Count state distribution
     unique, counts = np.unique(states, return_counts=True)
     state_dist = {int(s): int(c) for s, c in zip(unique, counts)}
-    print(f"   ✓ States mapped:")
-    print(f"      LoS (0):     {state_dist.get(0, 0)} samples ({state_dist.get(0, 0)/len(states)*100:.1f}%)")
-    print(f"      Partial (1): {state_dist.get(1, 0)} samples ({state_dist.get(1, 0)/len(states)*100:.1f}%)")
-    print(f"      Blocked (2): {state_dist.get(2, 0)} samples ({state_dist.get(2, 0)/len(states)*100:.1f}%)")
+    print(f"   ✓ States mapped (revised terminology per reviewer comments):")
+    print(f"      LoS-dominant (0):         {state_dist.get(0, 0)} samples ({state_dist.get(0, 0)/len(states)*100:.1f}%)")
+    print(f"      Partially-obstructed (1): {state_dist.get(1, 0)} samples ({state_dist.get(1, 0)/len(states)*100:.1f}%)")
+    print(f"      Diffuse-dominant (2):     {state_dist.get(2, 0)} samples ({state_dist.get(2, 0)/len(states)*100:.1f}%)")
     
     # STEP 4: Learn Markov transition matrix
     print("\n[4/5] Learning Markov transition matrix...")
@@ -599,35 +602,35 @@ def print_analysis_summary(all_params):
         print(f"ACTIVITY: {activity.upper()}")
         print(f"{'='*70}")
         
-        # State statistics
+        # State statistics (revised labels: LoS-dominant / partially-obstructed / diffuse-dominant)
         stats = params['state_statistics']
         print(f"\nState Distribution:")
         dist = stats['state_distribution']
-        print(f"  LoS (State 0):     {dist.get(0, 0)*100:5.1f}%")
-        print(f"  Partial (State 1): {dist.get(1, 0)*100:5.1f}%")
-        print(f"  NLoS (State 2):    {dist.get(2, 0)*100:5.1f}%")
+        print(f"  LoS-dominant (0):         {dist.get(0, 0)*100:5.1f}%")
+        print(f"  Partially-obstructed (1): {dist.get(1, 0)*100:5.1f}%")
+        print(f"  Diffuse-dominant (2):     {dist.get(2, 0)*100:5.1f}%")
         print(f"  Num transitions:   {stats['num_transitions']}")
         print(f"  Avg state duration: {stats['avg_state_duration']:.1f} samples")
         
         # Markov matrix
         print(f"\nMarkov Transition Matrix P({activity}):")
         P = params['markov_matrix']
-        print("         →  LoS  Partial  NLoS")
+        print("                            →  LoS-dom  Part-obs  Diff-dom")
         for i, row in enumerate(P):
-            state_name = ['LoS    ', 'Partial', 'NLoS   '][i]
-            print(f"  {state_name} {row}")
+            state_name = ['LoS-dominant    ', 'Partially-obstr.', 'Diffuse-dominant'][i]
+            print(f"  {state_name}  {row}")
         
         # Channel parameters
         print(f"\nChannel Parameters:")
         print(f"  Jitter (σ):  {params['sigma_jitter']:.3f}")
         print(f"  Diffuse (β): {params['beta_diffuse']:.3f}")
         
-        print(f"\nAttenuation Ranges (dB):")
+        print(f"\nAttenuation Ranges (dB) [effective surrogate parameters]:")
         att = params['attenuation_db']
         for state in [0, 1, 2]:
-            state_name = ['LoS    ', 'Partial', 'NLoS   '][state]
+            state_name = ['LoS-dominant    ', 'Partially-obstr.', 'Diffuse-dominant'][state]
             lo, hi = att[state]
-            print(f"  {state_name}: [{lo:6.2f}, {hi:6.2f}]")
+            print(f"  {state_name}: [{min(lo,hi):6.3f}, {max(lo,hi):6.3f}]")  # always lo ≤ hi
         
         # Processing info
         print(f"\nProcessing Methods Used:")

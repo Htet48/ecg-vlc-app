@@ -310,10 +310,11 @@ def compute_diffuse_path(signal, beta, fs=360, tau_diff=0.015):
     power fluctuations and unresolved reflected energy in the surrogate channel
     model. It is NOT a physically resolved optical multipath delay-spread model:
     optical propagation over a 0.5–0.8 m chest-to-wrist link is on the ns scale,
-    whereas τ_eff = 15 ms is orders of magnitude larger.
+    whereas τ_eff = 15 ms is orders of magnitude larger (Reviewer 3 C#7).
 
     The diffuse contribution is further weighted per channel state by η_diff[aₜ]
-    in the C6 combination step, making it state-dependent.
+    in the C6 combination step, making it state-dependent as required by
+    Reviewer 1 C#3 and Reviewer 3 C#2.
 
     Args:
         signal   : Input OFDM signal s(t).
@@ -390,8 +391,8 @@ def apply_led_nonlinearity(signal, Pmax=1.2, a1=1.0, a3=-0.02, bias=0.0):
     C7: Apply LED soft compression and hard clipping.
 
     The cubic coefficient a3 must be NEGATIVE to model saturation/compression
-    at high drive levels. A positive value would expand the signal, which is
-    physically incorrect for LED nonlinearity.
+    at high drive levels (Reviewer 3 C#7). A positive value would expand the
+    signal, which is physically incorrect for LED nonlinearity.
 
     Pipeline:
       1. Soft compression : y = a1·s + a3·s³  (a3 < 0 → saturation)
@@ -527,22 +528,28 @@ def simulate_vlc_channel(signal, activity='walking',
     # C2: Log-normal jitter ξ(t) (motion-induced fading)
     xi = compute_lognormal_jitter(n_samples, sigma, rng)
 
-    # C3: Lambertian geometric gain H0 (normalized)
+    # C3: Lambertian geometric gain H0 (normalized; not a calibrated link budget)
     H0 = compute_lambertian_channel(n_samples, fs, activity, rng)
 
     # C4: Direct path = H0 · g(aₜ) · ξ(t) · s(t)
     direct_signal = compute_direct_path(signal, H0, g_state, xi)
 
-    # C5: Diffuse/memory path (τ_diff = 15 ms effective memory constant)
+    # C5: Diffuse/memory path.
+    # τ_diff = 15 ms is an effective signal-level memory constant representing
+    # slow motion-induced received-power fluctuations, NOT a physical optical
+    # propagation delay (optical propagation over 0.5–0.8 m is on the ns scale).
     diffuse_signal = compute_diffuse_path(signal, beta, fs)
 
-    # C6: State-dependent combination of direct + diffuse paths
+    # C6: State-dependent combination of direct + diffuse paths.
+    # η_dir[state] and η_diff[state] weight each path per channel state so that
+    # LoS-dominant, partially-obstructed, and diffuse-dominant conditions produce
+    # different effective power-delay profiles (Reviewer 1 C#3, Reviewer 3 C#2).
     combined = combine_direct_diffuse(direct_signal, diffuse_signal, states=states)
 
-    # C7: LED soft compression (a3=-0.02) followed by hard clipping at Pmax
+    # C7: LED soft compression (a3=-0.02) followed by hard clipping at Pmax.
     clipped = apply_led_nonlinearity(combined)
 
-    # C8: Thermal + shot noise
+    # C8: Thermal + shot noise (simulation-domain effective parameters).
     received = add_noise(clipped, ambient, rng)
 
     # Store ALL intermediate components for Streamlit visualization
@@ -583,16 +590,16 @@ def get_state_statistics(states):
     total = len(states)
     
     stats = {
-        # Revised state labels
+        # Revised state labels (Reviewer 3 C#2, Reviewer 3 C#4)
         'LoS_dominant_percent':        counts[unique == 0][0] / total * 100 if 0 in unique else 0.0,
         'partially_obstructed_percent': counts[unique == 1][0] / total * 100 if 1 in unique else 0.0,
         'diffuse_dominant_percent':    counts[unique == 2][0] / total * 100 if 2 in unique else 0.0,
-        # Legacy keys kept for backward compatibility
+        # Legacy keys kept for backward compatibility with existing Streamlit display code
         'LoS_percent':     counts[unique == 0][0] / total * 100 if 0 in unique else 0.0,
         'Partial_percent': counts[unique == 1][0] / total * 100 if 1 in unique else 0.0,
         'NLoS_percent':    counts[unique == 2][0] / total * 100 if 2 in unique else 0.0,
         'num_transitions':    np.sum(np.diff(states) != 0),
         'avg_state_duration': len(states) / (np.sum(np.diff(states) != 0) + 1)
     }
-    
+
     return stats

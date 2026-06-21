@@ -28,6 +28,11 @@ from utils.imu_analysis import (
     learn_jitter_parameter,
     learn_diffuse_parameter
 )
+# Canonical, dataset-consistent surrogate parameters (single source of truth).
+# These are the values learned from the full IMU dataset and used to generate
+# the .npz dataset / metadata.json. The live demo below subsamples per the
+# sidebar slider, so we display these canonical values to avoid any mismatch.
+from utils.channel_utils import SIGMA_JITTER, BETA_DIFFUSE
 
 
 def show_imu_learning_page():
@@ -86,14 +91,17 @@ def show_imu_learning_page():
     
     df = st.session_state['imu_raw_data']
     
-    activity_map = {1: 'walking', 4: 'sitting', 5: 'standing'}
-    
+    # Activity codes MUST match the dataset generator (load_imu_dataset):
+    # walking=3, sitting=4, standing=5. Previously walking used code 1, which
+    # made the live Markov matrix / state distribution differ from the dataset.
+    activity_map = {3: 'walking', 4: 'sitting', 5: 'standing'}
+
     col1, col2 = st.columns([2, 1])
-    
+
     with col1:
         activity_label = st.selectbox(
             "Activity:",
-            options=[1, 4, 5],
+            options=[3, 4, 5],
             format_func=lambda x: f"{activity_map[x].capitalize()}",
             index=0
         )
@@ -140,7 +148,7 @@ def show_imu_learning_page():
                 name=axis, line=dict(color=color, width=1)
             ), row=2, col=1)
         
-        fig.update_layout(height=400, template='plotly_dark', showlegend=True)
+        fig.update_layout(height=400, template='plotly_white', showlegend=True)
         st.plotly_chart(fig, use_container_width=True)
     
     st.markdown("---")
@@ -187,7 +195,7 @@ Result: Isolates pure motion from static gravity component
             ))
             fig.update_layout(
                 title="Dynamic Motion (Gravity Removed)",
-                height=250, template='plotly_dark', showlegend=False
+                height=250, template='plotly_white', showlegend=False
             )
             st.plotly_chart(fig, use_container_width=True)
         
@@ -244,14 +252,24 @@ High stability → LoS, Low stability → NLoS
         unique, counts = np.unique(states, return_counts=True)
         state_dist = {int(s): int(c) for s, c in zip(unique, counts)}
         
-        with st.expander("3.4: Motion → Channel State Mapping", expanded=True):
+        with st.expander("3.4: Motion → Channel State Mapping (Surrogate Classification)", expanded=True):
+            st.caption(
+                "Percentile thresholds are activity-normalised surrogate classifiers, not hardware-calibrated "
+                "physical misalignment models (Reviewer 1 C#4, Reviewer 4 C#4)."
+            )
             st.code(f"""
-Dual-threshold mapping: (motion intensity, gyro stability) → state
+Dual-threshold surrogate mapping: (dynamic acc, gyro stability) → channel state
 
-State Distribution:
-  LoS (0):     {state_dist.get(0, 0):6,} ({state_dist.get(0,0)/len(states)*100:.1f}%)
-  Partial (1): {state_dist.get(1, 0):6,} ({state_dist.get(1,0)/len(states)*100:.1f}%)
-  NLoS (2):    {state_dist.get(2, 0):6,} ({state_dist.get(2,0)/len(states)*100:.1f}%)
+Revised state terminology:
+  LoS-dominant (0):         {state_dist.get(0, 0):6,} ({state_dist.get(0,0)/len(states)*100:.1f}%)
+  Partially-obstructed (1): {state_dist.get(1, 0):6,} ({state_dist.get(1,0)/len(states)*100:.1f}%)
+  Diffuse-dominant (2):     {state_dist.get(2, 0):6,} ({state_dist.get(2,0)/len(states)*100:.1f}%)
+
+Physical interpretation:
+  • High dynamic acc → arm displacement / possible obstruction of optical path
+  • High gyro std    → angular misalignment / orientation variability
+  • Activity-specific percentiles normalise for different motion regimes
+    (walking=high-motion, sitting=moderate, standing=low-motion)
 
 Transitions: {np.sum(np.diff(states) != 0):,}
             """)
@@ -263,8 +281,9 @@ Transitions: {np.sum(np.diff(states) != 0):,}
                 line=dict(color='#e74c3c', width=1.5)
             ))
             fig.update_layout(
-                title="Channel State Sequence (0=LoS, 1=Partial, 2=NLoS)",
-                height=250, template='plotly_dark',
+                title="Channel State Sequence  (0=LoS-dominant | 1=Partially-obstructed | 2=Diffuse-dominant)",
+                height=250, template='plotly_white',
+        font=dict(color="#111111"),
                 yaxis=dict(tickvals=[0,1,2]), showlegend=False
             )
             st.plotly_chart(fig, use_container_width=True)
@@ -281,17 +300,22 @@ Transitions: {np.sum(np.diff(states) != 0):,}
         
         # Learn channel parameters
         attenuation_db = learn_attenuation_parameters(motion_magnitude.values,states)
-        sigma_jitter = learn_jitter_parameter(gyro_stability)              # FIXED: gyro → jitter
-        beta_diffuse = learn_diffuse_parameter(motion_magnitude.values)    # FIXED: motion → diffuse
+        sigma_jitter = learn_jitter_parameter(gyro_stability)              # jitter ← gyro stability
+        beta_diffuse = learn_diffuse_parameter(motion_magnitude.values)    # diffuse ← motion intensity
+
+        # Display the canonical, dataset-consistent values. The live demo above
+        # subsamples per the sidebar slider, so the recomputed values can differ
+        # slightly from the full-dataset values (β is max-normalised → sensitive).
+        # Using the canonical constants guarantees the page matches the dataset
+        # and metadata.json exactly (no confusion).
+        sigma_jitter = SIGMA_JITTER.get(activity_name, sigma_jitter)
+        beta_diffuse = BETA_DIFFUSE.get(activity_name, beta_diffuse)
         
         with st.expander("3.5: Markov Model & Parameters", expanded=True):
             st.markdown("**1st-Order Markov Transition Matrix P:**")
             
-            df_P = pd.DataFrame(
-                P,
-                columns=['LoS', 'Partial', 'NLoS'],
-                index=['LoS', 'Partial', 'NLoS']
-            )
+            _slabels = ['LoS-dominant', 'Partially-obstructed', 'Diffuse-dominant']
+            df_P = pd.DataFrame(P, columns=_slabels, index=_slabels)
             # Color gradient: Green (high) → Yellow (medium) → Red (low)
             styled_P = df_P.style.format("{:.3f}").background_gradient(
                 cmap='RdYlGn',  # Red-Yellow-Green
@@ -301,15 +325,15 @@ Transitions: {np.sum(np.diff(states) != 0):,}
             )
             st.dataframe(styled_P, use_container_width=True)
             
-            st.markdown("**Channel Parameters (Learned from Motion):**")
+            st.markdown("**Channel Parameters (dataset-consistent, learned from motion):**")
             st.code(f"""
-σ_jitter:  {sigma_jitter:.4f} (from motion intensity variance)
-β_diffuse: {beta_diffuse:.4f} (from gyro stability)
+σ_jitter:  {sigma_jitter:.4f} (from gyro stability)
+β_diffuse: {beta_diffuse:.4f} (from motion intensity)
 
-Attenuation ranges (dB):
-  LoS:     {attenuation_db[0]}
-  Partial: {attenuation_db[1]}
-  NLoS:    {attenuation_db[2]}
+Attenuation ranges (dB) [effective surrogate params — not hardware-calibrated]:
+  LoS-dominant (0):         {attenuation_db[0]}
+  Partially-obstructed (1): {attenuation_db[1]}
+  Diffuse-dominant (2):     {attenuation_db[2]}
             """)
         
         # Store results - ACCUMULATE instead of overwrite
@@ -326,6 +350,13 @@ Attenuation ranges (dB):
         }
         
         st.success(f"✅ Analysis complete for {activity_name.capitalize()}!")
+
+        # Show threshold sensitivity for this activity
+        show_threshold_sensitivity(
+            activity_name,
+            motion_magnitude.values,
+            gyro_stability
+        )
         
         # =====================================================================
         # SUMMARY TABLE - ALL LEARNED ACTIVITIES
@@ -345,9 +376,9 @@ Attenuation ranges (dB):
                 
                 summary_rows.append({
                     'Activity': act_name.capitalize(),
-                    'LoS %': f"{state_dist.get(0, 0)/total_samples*100:.1f}%",
-                    'Partial %': f"{state_dist.get(1, 0)/total_samples*100:.1f}%",
-                    'NLoS %': f"{state_dist.get(2, 0)/total_samples*100:.1f}%",
+                    'LoS-dominant %':        f"{state_dist.get(0, 0)/total_samples*100:.1f}%",
+                    'Partially-obstructed %': f"{state_dist.get(1, 0)/total_samples*100:.1f}%",
+                    'Diffuse-dominant %':    f"{state_dist.get(2, 0)/total_samples*100:.1f}%",
                     'Transitions': params['transitions'],
                     'σ_jitter': f"{params['sigma_jitter']:.4f}",
                     'β_diffuse': f"{params['beta_diffuse']:.4f}"
@@ -375,24 +406,16 @@ Attenuation ranges (dB):
             st.markdown("### 🔄 Comparison Across Activities")
             
             # Markov matrices comparison
-            st.markdown("**Markov Transition Matrices:**")
+            st.markdown("**Markov Transition Matrices (revised state labels):**")
+            _sl = ['LoS-dom.', 'Part.-obstr.', 'Diff.-dom.']
             cols = st.columns(len(all_results))
-            
+
             for idx, (act_name, params) in enumerate(all_results.items()):
                 with cols[idx]:
                     st.markdown(f"**{act_name.capitalize()}**")
-                    df_P = pd.DataFrame(
-                        params['markov_matrix'],
-                        columns=['LoS', 'Partial', 'NLoS'],
-                        index=['LoS', 'Partial', 'NLoS']
-                    )
-                    # Color gradient: Green (high) → Yellow (medium) → Red (low)
+                    df_P = pd.DataFrame(params['markov_matrix'], columns=_sl, index=_sl)
                     styled_P = df_P.style.format("{:.3f}").background_gradient(
-                        cmap='RdYlGn',  # Red-Yellow-Green
-                        vmin=0.0,
-                        vmax=1.0,
-                        axis=None
-                    )
+                        cmap='RdYlGn', vmin=0.0, vmax=1.0, axis=None)
                     st.dataframe(styled_P, use_container_width=True)
             
             # Parameters comparison
@@ -407,6 +430,71 @@ Attenuation ranges (dB):
             
             df_comparison = pd.DataFrame(comparison_data)
             st.dataframe(df_comparison, use_container_width=True, hide_index=True)
+
+
+def show_threshold_sensitivity(activity_name, motion_magnitude, gyro_stability):
+    """
+    Show how ±10 percentile perturbations on the dual-threshold classifier
+    affect the state distribution (Reviewer 1 C#4, Reviewer 4 C#4).
+    """
+    st.markdown("---")
+    st.markdown("### 🔬 Threshold Sensitivity Analysis")
+    st.caption(
+        "Perturbs the IMU percentile thresholds (Δ = −10, 0, +10) and shows how "
+        "state distributions change. Demonstrates that the percentile rule is a "
+        "surrogate modelling choice, not a hardware-calibrated physical classifier."
+    )
+
+    base_percentiles = {
+        'standing': ([50, 80], [60, 85]),
+        'sitting':  ([40, 70], [50, 75]),
+        'walking':  ([25, 60], [35, 65]),
+    }
+    acc_p, gyr_p = base_percentiles.get(activity_name, ([33, 67], [33, 67]))
+
+    rows = []
+    for delta in [-10, 0, +10]:
+        al = np.percentile(motion_magnitude, np.clip(acc_p[0]+delta, 1, 99))
+        ah = np.percentile(motion_magnitude, np.clip(acc_p[1]+delta, 1, 99))
+        gl = np.percentile(gyro_stability,   np.clip(gyr_p[0]+delta, 1, 99))
+        gh = np.percentile(gyro_stability,   np.clip(gyr_p[1]+delta, 1, 99))
+
+        n = len(motion_magnitude)
+        st_arr = np.ones(n, dtype=int)
+        for i in range(n):
+            if motion_magnitude[i] < al and gyro_stability[i] < gl:
+                st_arr[i] = 0
+            elif motion_magnitude[i] > ah or gyro_stability[i] > gh:
+                st_arr[i] = 2
+
+        rows.append({
+            'Perturbation': f'Δ = {delta:+d}',
+            'LoS-dominant (%)':        f"{np.mean(st_arr==0)*100:.1f}",
+            'Partially-obstructed (%)': f"{np.mean(st_arr==1)*100:.1f}",
+            'Diffuse-dominant (%)':    f"{np.mean(st_arr==2)*100:.1f}",
+        })
+
+    df_th = pd.DataFrame(rows)
+    st.dataframe(df_th, use_container_width=True, hide_index=True)
+
+    # Bar chart
+    fig_th = go.Figure()
+    colors_th = {'LoS-dominant (%)': '#2ecc71',
+                 'Partially-obstructed (%)': '#f39c12',
+                 'Diffuse-dominant (%)': '#e74c3c'}
+    for col, clr in colors_th.items():
+        fig_th.add_trace(go.Bar(
+            name=col,
+            x=[r['Perturbation'] for r in rows],
+            y=[float(r[col]) for r in rows],
+            marker_color=clr
+        ))
+    fig_th.update_layout(
+        barmode='stack', height=320, template='plotly_white',
+        title=f"State Distribution vs Threshold Perturbation — {activity_name.capitalize()}",
+        yaxis_title='Proportion (%)', legend_title='State'
+    )
+    st.plotly_chart(fig_th, use_container_width=True)
 
 
 if __name__ == '__main__':

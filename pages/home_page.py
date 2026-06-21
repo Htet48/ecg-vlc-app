@@ -15,9 +15,9 @@ def show_home():
                 unsafe_allow_html=True)
     
     st.markdown("""
-    ## Demonstrated by Htet@Grace (2026)
+    ## Master's Thesis Demonstration - Htet@Grace (2026)
     
-    Welcome to the interactive demonstration of the work on **Motion-Driven Markov Channel Modeling and Learning-Based Reconstruction for On-Body Optical Wireless ECG Transmission**.
+    Welcome to the interactive demonstration of my thesis work on **Robust ECG Signal Reconstruction in Dynamic On-Body Visible Light Communication via Advanced Deep Learning** with **motion-aware channel modeling**.
     """)
     
     st.markdown("---")
@@ -63,59 +63,46 @@ def show_home():
     st.markdown("### 🔄 Complete System Pipeline")
     
     pipeline_text = """
-    ┌─────────────────────────────────────────────────────────────────┐
-    │                    ECG SIGNAL SOURCE                            │
-    │  MIT-BIH Database → 1080 samples (3 sec × 360 Hz)               │
-    └─────────────────────────────────────────────────────────────────┘
-                                    ↓
-    ┌─────────────────────────────────────────────────────────────────┐
-    │               STAGE A: ACO-OFDM MODULATION                      │
-    │  A1. ECG → 8-bit Quantization                                   │
-    │  A2. Bits → QAM Symbols (4-QAM)                                 │
-    │  A3. ACO-OFDM (Odd subcarriers + IFFT + Cyclic Prefix)          │
-    └─────────────────────────────────────────────────────────────────┘
-                                    ↓
-                            s(t) [OFDM Signal]
-                                    ↓
-    ┌─────────────────────────────────────────────────────────────────┐
-    │         STAGE B: MARKOV STATE GENERATION (IMU-LEARNED)          │
-    │  • Load real IMU data (accelerometer + gyroscope)               │
-    │  • Physics-based processing (EMA, Rolling Std)                  │
-    │  • Learn transition matrix P from motion patterns               │
-    │  • Generate state sequence: a[t] ∈ {LoS, Partial, NLoS}         │
-    └─────────────────────────────────────────────────────────────────┘
-                                    ↓
-    ┌─────────────────────────────────────────────────────────────────┐
-    │            STAGE C: VLC CHANNEL EFFECTS (8 SUB-STAGES)          │
-    │  C1. State-Dependent Attenuation g(aₜ)   ← Learned from IMU      |
-    │  C2. Log-Normal Jitter ξ(t)             ← Learned from IMU      │
-    │  C3. Lambertian Channel H₀(t)           ← Physics model         │
-    │  C4. Direct Path Combination                                    │
-    │  C5. Diffuse Path h_diff(t)             ← Learned from IMU      │
-    │  C6. Signal Combination (Direct + Diffuse)                      │
-    │  C7. LED Nonlinearity & Clipping                                │ 
-    │  C8. Noise Addition (Thermal + Shot)                            │
-    └─────────────────────────────────────────────────────────────────┘
-                                    ↓
-                            r(t) [Received Signal]
-                                    ↓
-    ┌─────────────────────────────────────────────────────────────────┐
-    │          STAGE D: ACO-OFDM DEMODULATION & BER                   │
-    │  • Remove Cyclic Prefix                                         │
-    │  • FFT & Extract Odd Subcarriers                                │
-    │  • QAM De-mapping → Bits                                        │
-    │  • Bits → Reconstructed ECG                                     │
-    │  • Calculate Bit Error Rate (BER)                               │
-    └─────────────────────────────────────────────────────────────────┘
-                                    ↓
-    ┌─────────────────────────────────────────────────────────────────┐
-    │          STAGE E: SIGNAL RECONSTRUCTION (OPTIONAL)              │
-    │  Classical Methods:                                             │
-    │    • Interpolation(1), Wavelet(2), OFDM Mitigation(3)           │
-    │      and Combined(1+2+3)                                        │
-    │  Deep Learning:                                                 │
-    │    • CNN-BiLSTM (trained on degraded signals)                   │
-    └─────────────────────────────────────────────────────────────────┘  
+             ECG SIGNAL SOURCE
+MIT-BIH Database → 1080 samples (3 sec × 360 Hz)
+                         ↓
+   STAGE A: ACO-OFDM MODULATION        
+A1. ECG → 8-bit Quantization       
+A2. Bits → QAM Symbols (4-QAM)         
+A3. ACO-OFDM (Odd subcarriers + IFFT + Cyclic Prefix)
+                         ↓
+                s(t) [OFDM Signal]
+                         ↓
+   STAGE B: MARKOV STATE GENERATION (IMU-LEARNED)
+• Load real IMU data (accelerometer + gyroscope)
+• Physics-based processing (EMA, Rolling Std)   
+• Learn transition matrix P from motion patterns
+• Generate state sequence: a[t] ∈ {LoS, Partial, NLoS}  
+                         ↓
+   STAGE C: VLC CHANNEL EFFECTS (8 SUB-STAGES)
+C1. State-Dependent Attenuation g(aₜ)  ← Learned from IMU
+C2. Log-Normal Jitter ξ(t)             ← Learned from IMU
+C3. Lambertian Channel H₀(t)           ← Physics model
+C4. Direct Path Combination        
+C5. Diffuse Path h_diff(t)             ← Learned from IMU
+C6. Signal Combination (Direct + Diffuse)       
+C7. LED Nonlinearity & Clipping   
+C8. Noise Addition (Thermal + Shot)             
+                          ↓
+                r(t) [Received Signal]
+                          ↓
+    STAGE D: ACO-OFDM DEMODULATION & BER     
+• Remove Cyclic Prefix             
+• FFT & Extract Odd Subcarriers   
+• QAM De-mapping → Bits            
+• Bits → Reconstructed ECG         
+• Calculate Bit Error Rate (BER)  
+                          ↓
+    STAGE E: SIGNAL RECONSTRUCTION
+Classical Methods:                 
+  • Interpolation(1), Wavelet(2), OFDM Mitigation(3) and Combined(1+2+3). 
+Deep Learning:                     
+  • CNN-BiLSTM (trained on degraded signals)  
     """
     
     st.code(pipeline_text, language='text')
@@ -193,14 +180,15 @@ def show_home():
     
     If you use this work, please cite:
     ```
-    Htet@Grace (2026). "Motion-Driven Markov Channel Modeling and Learning-Based Reconstruction for On-Body Optical Wireless ECG Transmission".
+    Htet@Grace (2026). "Robust ECG Signal Reconstruction in Dynamic On-Body Visible Light Communication via Advanced Deep Learning". Master's Thesis.
     ```
     """)
     
     # Contact
     st.info("""
     **Questions or Feedback?**  
-      Please contact: htetag414@gmail.com
+    This is a thesis demonstration application. The complete methodology and 
+    results are available in the full thesis document.
     """)
 
 
