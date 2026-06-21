@@ -19,106 +19,86 @@ import sys
 import matplotlib
 from pathlib import Path
 
-# ── Force white background for ALL matplotlib figures ─────────────────────
+# ── Force dark background for ALL matplotlib figures ──────────────────────
 matplotlib.rcParams.update({
-    'figure.facecolor':      'white',
-    'axes.facecolor':        'white',
-    'axes.edgecolor':        '#333333',
-    'axes.labelcolor':       '#111111',
-    'xtick.color':           '#111111',
-    'ytick.color':           '#111111',
-    'text.color':            '#111111',
-    'grid.color':            '#DDDDDD',
+    'figure.facecolor':      '#0e1117',
+    'axes.facecolor':        '#262730',
+    'axes.edgecolor':        '#555555',
+    'axes.labelcolor':       '#ffffff',
+    'xtick.color':           '#aaaaaa',
+    'ytick.color':           '#aaaaaa',
+    'text.color':            '#ffffff',
+    'grid.color':            '#444444',
     'grid.linestyle':        '--',
     'grid.linewidth':        0.6,
     'lines.linewidth':       1.8,
     'figure.dpi':            150,
     'savefig.dpi':           300,
-    'savefig.facecolor':     'white',
+    'savefig.facecolor':     '#0e1117',
     'savefig.edgecolor':     'none',
     'savefig.bbox':          'tight',
     'font.family':           'sans-serif',
     'font.size':             11,
     'axes.titlesize':        12,
     'axes.labelsize':        11,
-    'legend.framealpha':     0.9,
-    'legend.edgecolor':      '#CCCCCC',
+    'legend.framealpha':     0.8,
+    'legend.edgecolor':      '#555555',
+    'legend.facecolor':      '#262730',
 })
 
-# ── Deep intercept: block dark_background style + patch ALL figure creation ─
 import matplotlib.pyplot as plt
-import matplotlib.figure
 import functools
 
-def _force_white_figure(fig):
-    """Strip dark background from any matplotlib figure — all axes."""
-    fig.patch.set_facecolor('white')
+def _force_dark_figure(fig):
+    """Apply dark background to any matplotlib figure."""
+    fig.patch.set_facecolor('#0e1117')
     for ax in fig.get_axes():
-        ax.set_facecolor('white')
-        ax.tick_params(colors='#111111', which='both', labelcolor='#111111')
-        ax.xaxis.label.set_color('#111111')
-        ax.yaxis.label.set_color('#111111')
-        ax.title.set_color('#111111')
+        ax.set_facecolor('#262730')
+        ax.tick_params(colors='#aaaaaa', which='both', labelcolor='#aaaaaa')
+        ax.xaxis.label.set_color('#ffffff')
+        ax.yaxis.label.set_color('#ffffff')
+        ax.title.set_color('#ffffff')
         for spine in ax.spines.values():
-            spine.set_edgecolor('#333333')
-        for line in ax.get_lines():
-            lc = line.get_color()
-            if str(lc).lower() in ('white', '#ffffff', '#fff', 'w',
-                                   (1.0, 1.0, 1.0, 1.0)):
-                line.set_color('#111111')
+            spine.set_edgecolor('#555555')
         leg = ax.get_legend()
         if leg:
-            leg.get_frame().set_facecolor('white')
-            leg.get_frame().set_edgecolor('#CCCCCC')
+            leg.get_frame().set_facecolor('#262730')
+            leg.get_frame().set_edgecolor('#555555')
             for txt in leg.get_texts():
-                txt.set_color('#111111')
+                txt.set_color('#ffffff')
     return fig
 
-# ── 1. Block plt.style.use('dark_background') ─────────────────────────────
-_orig_style_use = plt.style.use
-def _safe_style_use(style, *args, **kwargs):
-    """Ignore any dark style requests."""
-    if isinstance(style, str) and 'dark' in style.lower():
-        return
-    return _orig_style_use(style, *args, **kwargs)
-plt.style.use = _safe_style_use
-
-# ── 2. Patch plt.subplots so every new figure starts white ────────────────
+# ── Patch plt.subplots so every new figure starts dark ────────────────────
 _orig_subplots = plt.subplots
 @functools.wraps(_orig_subplots)
-def _white_subplots(*args, **kwargs):
-    # Remove any dark facecolor kwarg
-    if 'facecolor' in kwargs:
-        kwargs.pop('facecolor')
+def _dark_subplots(*args, **kwargs):
     fig, ax = _orig_subplots(*args, **kwargs)
-    fig.patch.set_facecolor('white')
+    fig.patch.set_facecolor('#0e1117')
     if hasattr(ax, '__iter__'):
         for a in ax.flatten():
-            a.set_facecolor('white')
+            a.set_facecolor('#262730')
     else:
-        ax.set_facecolor('white')
+        ax.set_facecolor('#262730')
     return fig, ax
-plt.subplots = _white_subplots
+plt.subplots = _dark_subplots
 
-# ── 3. Patch plt.figure so every new figure starts white ──────────────────
+# ── Patch plt.figure so every new figure starts dark ──────────────────────
 _orig_figure = plt.figure
 @functools.wraps(_orig_figure)
-def _white_figure(*args, **kwargs):
-    if 'facecolor' in kwargs:
-        kwargs.pop('facecolor')
+def _dark_figure(*args, **kwargs):
     fig = _orig_figure(*args, **kwargs)
-    fig.patch.set_facecolor('white')
+    fig.patch.set_facecolor('#0e1117')
     return fig
-plt.figure = _white_figure
+plt.figure = _dark_figure
 
-# ── 4. Patch st.pyplot to force white just before rendering ───────────────
+# ── Patch st.pyplot to force dark just before rendering ───────────────────
 _st_pyplot_orig = st.pyplot
 @functools.wraps(_st_pyplot_orig)
-def _white_pyplot(fig=None, **kwargs):
+def _dark_pyplot(fig=None, **kwargs):
     target = fig if fig is not None else plt.gcf()
-    target = _force_white_figure(target)
+    target = _force_dark_figure(target)
     return _st_pyplot_orig(target, **kwargs)
-st.pyplot = _white_pyplot
+st.pyplot = _dark_pyplot
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent))
@@ -131,78 +111,81 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ── Light/white CSS theme — comprehensive override ────────────────────────
+# ── Dark CSS theme — comprehensive override ───────────────────────────────
 st.markdown("""
 <style>
-    /* Global white background */
+    /* Global dark background */
     .stApp, .main, .main .block-container,
     [data-testid="stAppViewContainer"],
     [data-testid="stHeader"] {
-        background-color: #FFFFFF !important;
-        color: #1A1A1A !important;
+        background-color: #0e1117 !important;
+        color: #ffffff !important;
     }
 
-    /* Sidebar light grey */
+    /* Sidebar dark */
     section[data-testid="stSidebar"],
     section[data-testid="stSidebar"] > div {
-        background-color: #F5F7FA !important;
-        border-right: 1px solid #E0E0E0 !important;
+        background-color: #262730 !important;
+        border-right: 1px solid #444444 !important;
     }
-    section[data-testid="stSidebar"] * { color: #1A1A1A !important; }
+    section[data-testid="stSidebar"] * { color: #ffffff !important; }
 
     /* Code blocks */
     pre, code,
     .stCodeBlock, .stCodeBlock *,
     [data-testid="stCode"], [data-testid="stCode"] *,
     .highlight, .highlight * {
-        background-color: #F8F9FA !important;
-        color: #1A1A1A !important;
-        border: 1px solid #E0E0E0 !important;
+        background-color: #1e2130 !important;
+        color: #e0e0e0 !important;
+        border: 1px solid #444444 !important;
         border-radius: 6px !important;
     }
 
-    /* Metric values — IEEE blue */
+    /* Metric values */
     [data-testid="stMetricValue"] {
-        color: #2E75B6 !important;
+        color: #4a9eff !important;
         font-size: 1.8rem !important;
     }
-    [data-testid="stMetricLabel"] { color: #444444 !important; }
+    [data-testid="stMetricLabel"] { color: #aaaaaa !important; }
 
     /* Headings */
-    .main-header, h1, h2, h3, h4, h5, h6 { color: #1A1A2E !important; }
+    .main-header, h1, h2, h3, h4, h5, h6 { color: #ffffff !important; }
 
     /* Tabs */
-    .stTabs [data-baseweb="tab"] { color: #444444 !important; }
+    .stTabs [data-baseweb="tab"] { color: #aaaaaa !important; }
     .stTabs [aria-selected="true"] {
-        color: #2E75B6 !important;
-        border-bottom-color: #2E75B6 !important;
+        color: #4a9eff !important;
+        border-bottom-color: #4a9eff !important;
     }
 
     /* Buttons */
     .stButton > button {
-        background-color: #2E75B6 !important;
-        color: #FFFFFF !important;
+        background-color: #4a9eff !important;
+        color: #ffffff !important;
         border: none !important;
         border-radius: 6px !important;
     }
 
     /* Tables */
     .dataframe, .dataframe * {
-        background-color: #FFFFFF !important;
-        color: #1A1A1A !important;
+        background-color: #262730 !important;
+        color: #ffffff !important;
     }
 
     /* Expanders */
     .streamlit-expanderHeader {
-        background-color: #F5F7FA !important;
-        color: #1A1A2E !important;
+        background-color: #262730 !important;
+        color: #ffffff !important;
     }
 
     /* Selectbox and radio */
-    .stSelectbox *, .stRadio * { color: #1A1A1A !important; }
+    .stSelectbox *, .stRadio * { color: #ffffff !important; }
 
     /* Dividers */
-    hr { border-color: #E0E0E0 !important; }
+    hr { border-color: #444444 !important; }
+
+    /* General text */
+    p, li, span, label { color: #e0e0e0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
