@@ -428,8 +428,8 @@ def display_training_history(models_data, selected_view):
                     
                     fig.update_layout(
                         height=800,
-                        template='plotly_white',
-        font=dict(color="#111111"),
+                        template='plotly_dark',
+                        font=dict(color="#ffffff"),
                         showlegend=True,
                         legend=dict(
                             orientation="h",
@@ -567,8 +567,8 @@ def display_training_history(models_data, selected_view):
         
         fig.update_layout(
             height=700,
-            template='plotly_white',
-        font=dict(color="#111111"),
+            template='plotly_dark',
+            font=dict(color="#ffffff"),
             showlegend=True,
             legend=dict(
                 orientation="h",
@@ -1102,13 +1102,13 @@ def display_sample_comparison(models_data, selected_view):
         legend=dict(orientation="v", yanchor="top", y=1.0,
                     xanchor="left", x=1.01,
                     font=dict(size=11),
-                    bgcolor="rgba(255,255,255,0.9)", bordercolor="rgba(100,100,100,0.5)",
+                    bgcolor="rgba(30,33,48,0.9)", bordercolor="rgba(100,100,100,0.5)",
                     borderwidth=1),
         hovermode="x unified",
-        template="plotly_white",
-        font=dict(color="#111111"),
-        plot_bgcolor="white",
-        paper_bgcolor="white",
+        template="plotly_dark",
+        font=dict(color="#ffffff"),
+        plot_bgcolor="#0e1117",
+        paper_bgcolor="#0e1117",
         margin=dict(r=160, t=60, b=50),
     )
 
