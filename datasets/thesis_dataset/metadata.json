@@ -1,0 +1,813 @@
+{
+  "config": {
+    "TARGET_WINDOW": 1080,
+    "FFT_SIZE": 256,
+    "CP_LENGTH": 64,
+    "QAM_ORDER": 4,
+    "NOISE_MODEL": "Physical (\u03c3_th, \u03c3_sh) \u2014 simulation-domain effective parameters",
+    "AMBIENT": "bright",
+    "ACTIVITIES": [
+      "walking",
+      "sitting",
+      "standing"
+    ],
+    "STATE_NAMES": [
+      "LoS-dominant",
+      "partially-obstructed",
+      "diffuse-dominant"
+    ]
+  },
+  "revision_notes": {
+    "version": "v4.0 \u2014 ACO-OFDM corrected (N/4=64 independent subcarriers, 68 frames)",
+    "changes": [
+      "FIXED: LED cubic coefficient sign: a3=-0.02 (compression, not expansion)",
+      "FIXED: State-dependent direct/diffuse path weights (\u03b7_dir, \u03b7_diff)",
+      "REVISED: \u03c4_eff reframed as effective signal-level memory, not optical propagation delay",
+      "REVISED: H0 described as normalized geometric gain factor, not calibrated link budget",
+      "CORRECTED: ACO-OFDM independent subcarrier count: N/4=64 per frame (not N/2=128); frame count 68 (not 34)",
+      "CLARIFIED: h_eff formula exp(-t_k/tau_eff) where t_k=k/fs and tau_eff=0.015 s (15 ms); both old and new formulas were algebraically identical -- BER increase was due to LED sign fix and state weights, not h_eff",
+      "ADDED: Sensitivity analysis (low/nominal/severe ambient/occlusion scenarios)",
+      "ADDED: Threshold sensitivity utility for IMU percentile perturbation",
+      "REVISED: State labels \u2192 LoS-dominant, partially-obstructed, diffuse-dominant",
+      "REVISED: BER explicitly described as uncoded/raw BER after ACO-OFDM demodulation",
+      "REVISED: SQ-SNR uses single summation-based definition throughout",
+      "CLARIFIED: ACO-OFDM frame padding (68 frames, last zero-padded by 32 symbols)"
+    ]
+  },
+  "channel_model": {
+    "scope": "IMU-informed motion-conditioned surrogate channel model",
+    "NOT": "Hardware-calibrated optical channel model",
+    "C1_state_attenuation": "State-dependent effective attenuation from IMU motion",
+    "C2_jitter": "Log-normal jitter, \u03c3 learned from gyro stability",
+    "C3_lambertian": "H0 = normalized geometric gain factor (\u22481.0)",
+    "C4_direct_path": "\u03b7_dir[state] \u00d7 H0 \u00d7 g(a_t) \u00d7 \u03be(t) \u00d7 s(t)",
+    "C5_diffuse_path": "\u03b7_diff[state] \u00d7 \u03b2 \u00d7 h_eff(t) * s(t); \u03c4_eff=15ms is effective memory, not propagation delay",
+    "C6_combination": "State-dependent weighted sum of direct + diffuse",
+    "C7_led_nonlinearity": "a1\u00d7s + a3\u00d7s\u00b3 (a3=-0.02, compression); hard clip at Pmax=1.2",
+    "C8_noise": "Bright: \u03c3_th=0.0015, \u03c3_sh=0.0025 (simulation-domain effective)",
+    "state_weights": {
+      "LoS-dominant (0)": {
+        "eta_dir": 0.95,
+        "eta_diff": 0.05
+      },
+      "partially-obstructed (1)": {
+        "eta_dir": 0.6,
+        "eta_diff": 0.4
+      },
+      "diffuse-dominant (2)": {
+        "eta_dir": 0.2,
+        "eta_diff": 0.8
+      }
+    },
+    "simulation_to_reality_gap": [
+      "Direct sunlight, time-varying shadows, and artificial-light flicker not modeled",
+      "Skin-tone-dependent reflectance and clothing-specific occlusion not modeled",
+      "LED beam divergence and photodetector angular response not hardware-calibrated",
+      "Hardware validation with chest-mounted LED and wrist-mounted photodiode required"
+    ]
+  },
+  "reproducibility": {
+    "dataset_version": "v4.0 \u2014 ACO-OFDM corrected (N/4=64 independent subcarriers, 68 frames)",
+    "generation_script": "generate_dataset_npz_FINAL_FIXED_latest.py",
+    "python_seed_train": 42,
+    "python_seed_val": 123,
+    "python_seed_test": 456,
+    "channel_precompute_seed": 42,
+    "patient_level_split": {
+      "train_records": [
+        "100",
+        "101",
+        "102",
+        "103",
+        "104",
+        "105",
+        "106",
+        "107",
+        "108",
+        "109",
+        "111",
+        "112",
+        "113",
+        "114",
+        "115",
+        "116",
+        "117",
+        "118",
+        "119",
+        "121",
+        "123",
+        "124",
+        "200",
+        "201",
+        "202",
+        "203",
+        "205",
+        "207",
+        "209",
+        "223",
+        "232"
+      ],
+      "val_records": [
+        "122",
+        "208",
+        "210",
+        "213",
+        "217"
+      ],
+      "test_records": [
+        "212",
+        "214",
+        "215",
+        "233"
+      ],
+      "split_rationale": "Patient-level (record-level) split \u2014 no ECG segments from the same MIT-BIH patient appear in more than one split, preventing data leakage"
+    },
+    "acofdm_parameters": {
+      "N_FFT": 256,
+      "CP_length": 64,
+      "QAM_order": 4,
+      "independent_subcarriers": 64,
+      "frames_per_ecg_segment": 68,
+      "bits_per_ecg_segment": 8640,
+      "qam_symbols_per_segment": 4320,
+      "last_frame_padding_symbols": 32
+    },
+    "channel_parameters": {
+      "tau_eff_seconds": 0.015,
+      "tau_eff_samples": 5.4,
+      "h_eff_formula": "exp(-k / (fs * tau_eff))  where k = sample index, tau_eff = 0.015 s",
+      "sigma_th": 0.0015,
+      "sigma_sh": 0.0025,
+      "a1": 1.0,
+      "a3": -0.02,
+      "Pmax": 1.2,
+      "eta_dir": {
+        "0": 0.95,
+        "1": 0.6,
+        "2": 0.2
+      },
+      "eta_diff": {
+        "0": 0.05,
+        "1": 0.4,
+        "2": 0.8
+      },
+      "surrogate_note": "All parameters are heuristic/effective surrogate values, not hardware-calibrated measurements"
+    }
+  },
+  "statistics": {
+    "train_segments": 31000,
+    "val_segments": 5000,
+    "test_segments": 4000,
+    "total_segments": 40000,
+    "generation_time_sec": 2681.8875370025635,
+    "ber_distribution": {
+      "train": {
+        "mean": 0.0680592107228196,
+        "std": 0.02326434874605078,
+        "min": 0.025,
+        "max": 0.11296296296296296,
+        "p25": 0.041435185185185186,
+        "p50": 0.06655092592592593,
+        "p75": 0.09178240740740741,
+        "per_activity": {
+          "walking": {
+            "mean": 0.09317722786847828,
+            "std": 0.004441161971022295,
+            "n": 12332
+          },
+          "sitting": {
+            "mean": 0.06476780361298465,
+            "std": 0.004074811331040752,
+            "n": 9390
+          },
+          "standing": {
+            "mean": 0.03800434171237416,
+            "std": 0.003536540369626787,
+            "n": 9278
+          }
+        }
+      },
+      "val": {
+        "mean": 0.06780472222222222,
+        "std": 0.02336151229067163,
+        "min": 0.027546296296296298,
+        "max": 0.10717592592592592,
+        "p25": 0.04097222222222222,
+        "p50": 0.06620370370370371,
+        "p75": 0.09166666666666666,
+        "per_activity": {
+          "walking": {
+            "mean": 0.09332831396447468,
+            "std": 0.004378936015544093,
+            "n": 1960
+          },
+          "sitting": {
+            "mean": 0.06483814655699982,
+            "std": 0.004059897363977662,
+            "n": 1513
+          },
+          "standing": {
+            "mean": 0.037982973149967264,
+            "std": 0.0034426677713668905,
+            "n": 1527
+          }
+        }
+      },
+      "test": {
+        "mean": 0.0682566550925926,
+        "std": 0.023325247617798656,
+        "min": 0.028009259259259258,
+        "max": 0.11226851851851852,
+        "p25": 0.04131944444444444,
+        "p50": 0.06660879629629629,
+        "p75": 0.0920138888888889,
+        "per_activity": {
+          "walking": {
+            "mean": 0.09338135234984828,
+            "std": 0.004229227894165729,
+            "n": 1599
+          },
+          "sitting": {
+            "mean": 0.06494019258642489,
+            "std": 0.004005496469746877,
+            "n": 1201
+          },
+          "standing": {
+            "mean": 0.03809722222222223,
+            "std": 0.003453352274593732,
+            "n": 1200
+          }
+        }
+      }
+    },
+    "snr_distribution": {
+      "train": {
+        "mean": 8.049970789429407,
+        "std": 2.9836577208358857,
+        "min": 1.8834899176003583,
+        "max": 18.685646021748127,
+        "per_activity": {
+          "walking": {
+            "mean": 6.888014791727536,
+            "std": 2.503255911301741,
+            "n": 12332
+          },
+          "sitting": {
+            "mean": 7.991599918890018,
+            "std": 2.7639710678638107,
+            "n": 9390
+          },
+          "standing": {
+            "mean": 9.653478424482687,
+            "std": 3.051960836590339,
+            "n": 9278
+          }
+        }
+      },
+      "val": {
+        "mean": 8.132350724154247,
+        "std": 2.5492357770636724,
+        "min": 3.263552631158663,
+        "max": 16.715824640332308,
+        "per_activity": {
+          "walking": {
+            "mean": 6.898848989032457,
+            "std": 2.044586595471629,
+            "n": 1960
+          },
+          "sitting": {
+            "mean": 8.046803223964071,
+            "std": 2.269619897974608,
+            "n": 1513
+          },
+          "standing": {
+            "mean": 9.800390520242289,
+            "std": 2.4630749772662974,
+            "n": 1527
+          }
+        }
+      },
+      "test": {
+        "mean": 8.899483851514827,
+        "std": 2.763546454381906,
+        "min": 2.416721759876541,
+        "max": 16.45846057343682,
+        "per_activity": {
+          "walking": {
+            "mean": 7.606069836666333,
+            "std": 2.2307819052734543,
+            "n": 1599
+          },
+          "sitting": {
+            "mean": 8.820251486683048,
+            "std": 2.421482343753898,
+            "n": 1201
+          },
+          "standing": {
+            "mean": 10.702256418102909,
+            "std": 2.7335616260793794,
+            "n": 1200
+          }
+        }
+      }
+    },
+    "prd_distribution": {
+      "train": {
+        "mean": 51.881005987111266,
+        "std": 23.7295712293512,
+        "min": 11.518342750233005,
+        "max": 184.35218954410297,
+        "per_activity": {
+          "walking": {
+            "mean": 61.270784621614666,
+            "std": 25.820982165861857,
+            "n": 12332
+          },
+          "sitting": {
+            "mean": 51.2460484028505,
+            "std": 21.413442464868467,
+            "n": 9390
+          },
+          "standing": {
+            "mean": 40.04305616985677,
+            "std": 16.535859211804084,
+            "n": 9278
+          }
+        }
+      },
+      "val": {
+        "mean": 48.230002205428896,
+        "std": 17.072375789244393,
+        "min": 14.611517805341412,
+        "max": 109.48272377482218,
+        "per_activity": {
+          "walking": {
+            "mean": 57.077834083677594,
+            "std": 17.39684428109743,
+            "n": 1960
+          },
+          "sitting": {
+            "mean": 47.82220079406979,
+            "std": 14.676695210799302,
+            "n": 1513
+          },
+          "standing": {
+            "mean": 37.27731920216688,
+            "std": 11.483252761393747,
+            "n": 1527
+          }
+        }
+      },
+      "test": {
+        "mean": 44.38755560514617,
+        "std": 19.471840311475297,
+        "min": 15.20804578941207,
+        "max": 131.30559245747267,
+        "per_activity": {
+          "walking": {
+            "mean": 52.71307709303508,
+            "std": 20.90607264701213,
+            "n": 1599
+          },
+          "sitting": {
+            "mean": 43.782977866046885,
+            "std": 17.13059940738603,
+            "n": 1201
+          },
+          "standing": {
+            "mean": 33.898879776416045,
+            "std": 13.601942265070218,
+            "n": 1200
+          }
+        }
+      }
+    },
+    "activity_distribution": {
+      "train": {
+        "walking": {
+          "count": 12332,
+          "pct": 39.8
+        },
+        "sitting": {
+          "count": 9390,
+          "pct": 30.3
+        },
+        "standing": {
+          "count": 9278,
+          "pct": 29.9
+        }
+      },
+      "val": {
+        "walking": {
+          "count": 1960,
+          "pct": 39.2
+        },
+        "sitting": {
+          "count": 1513,
+          "pct": 30.3
+        },
+        "standing": {
+          "count": 1527,
+          "pct": 30.5
+        }
+      },
+      "test": {
+        "walking": {
+          "count": 1599,
+          "pct": 40.0
+        },
+        "sitting": {
+          "count": 1201,
+          "pct": 30.0
+        },
+        "standing": {
+          "count": 1200,
+          "pct": 30.0
+        }
+      }
+    },
+    "state_distribution": {
+      "train": {
+        "LoS-dominant": 27.4,
+        "partially-obstructed": 26.8,
+        "diffuse-dominant": 45.8
+      },
+      "val": {
+        "LoS-dominant": 27.7,
+        "partially-obstructed": 26.8,
+        "diffuse-dominant": 45.5
+      },
+      "test": {
+        "LoS-dominant": 27.3,
+        "partially-obstructed": 26.7,
+        "diffuse-dominant": 45.9
+      }
+    },
+    "leakage_check": {
+      "patient_level_split": true,
+      "train_val_overlap": [],
+      "train_test_overlap": [],
+      "val_test_overlap": [],
+      "result": "No overlap \u2014 all splits use disjoint MIT-BIH records"
+    },
+    "ber_consistency_check": {
+      "train_val_ber_diff_pp": 0.025,
+      "train_test_ber_diff_pp": 0.02,
+      "note": "Differences < 0.5 pp indicate consistent channel simulation across splits (no systematic bias from patient selection)"
+    },
+    "note": "BER is raw/uncoded BER after ACO-OFDM demodulation without FEC or equalization",
+    "full_dataset": {
+      "n": 40000,
+      "ber_pct": 6.805,
+      "sqsnr_db": 8.145,
+      "prd_pct": 50.675,
+      "per_activity": {
+        "walking": {
+          "ber_pct": 9.322,
+          "sqsnr_db": 6.962,
+          "prd_pct": 59.893,
+          "n": 15891
+        },
+        "sitting": {
+          "ber_pct": 6.479,
+          "sqsnr_db": 8.081,
+          "prd_pct": 50.078,
+          "n": 12104
+        },
+        "standing": {
+          "ber_pct": 3.801,
+          "sqsnr_db": 9.777,
+          "prd_pct": 39.077,
+          "n": 12005
+        }
+      },
+      "note": "Authoritative full-dataset (all segments) BER, SQ-SNR & PRD; per-activity reconciles with overall."
+    },
+    "split_comparison": {
+      "note": "Overall BER, SQ-SNR and PRD for easy comparison across scopes. Headline value = full (all segments).",
+      "full": {
+        "n": 40000,
+        "ber_pct": 6.805,
+        "sqsnr_db": 8.145,
+        "prd_pct": 50.675
+      },
+      "train": {
+        "n": 31000,
+        "ber_pct": 6.806,
+        "sqsnr_db": 8.05,
+        "prd_pct": 51.881
+      },
+      "val": {
+        "n": 5000,
+        "ber_pct": 6.78,
+        "sqsnr_db": 8.132,
+        "prd_pct": 48.23
+      },
+      "test": {
+        "n": 4000,
+        "ber_pct": 6.826,
+        "sqsnr_db": 8.899,
+        "prd_pct": 44.388
+      }
+    }
+  },
+  "sensitivity_analysis": {
+    "low_ambient": {
+      "walking": {
+        "ber": 0.08813541666666666,
+        "sq_snr": 4.457673874136379,
+        "prd": 89.39494912210971,
+        "n": 200
+      },
+      "sitting": {
+        "ber": 0.06283738425925926,
+        "sq_snr": 5.187869493314601,
+        "prd": 75.43621466156412,
+        "n": 200
+      },
+      "standing": {
+        "ber": 0.036334490740740744,
+        "sq_snr": 6.636579057033332,
+        "prd": 57.552860743885475,
+        "n": 200
+      }
+    },
+    "nominal": {
+      "walking": {
+        "ber": 0.09316608796296297,
+        "sq_snr": 4.331515062824753,
+        "prd": 92.19384029147966,
+        "n": 200
+      },
+      "sitting": {
+        "ber": 0.0642170138888889,
+        "sq_snr": 5.1522643463231415,
+        "prd": 76.07540240426347,
+        "n": 200
+      },
+      "standing": {
+        "ber": 0.0379525462962963,
+        "sq_snr": 6.4959357610487976,
+        "prd": 58.9806310374028,
+        "n": 200
+      }
+    },
+    "severe_ambient": {
+      "walking": {
+        "ber": 0.11262673611111111,
+        "sq_snr": 3.9523235182380745,
+        "prd": 102.2415338614725,
+        "n": 200
+      },
+      "sitting": {
+        "ber": 0.07439641203703704,
+        "sq_snr": 4.776278227299041,
+        "prd": 82.59910933088184,
+        "n": 200
+      },
+      "standing": {
+        "ber": 0.04503414351851852,
+        "sq_snr": 6.033411915717038,
+        "prd": 63.94923945350702,
+        "n": 200
+      }
+    },
+    "_note": "Robustness subsample (200 segments/activity/scenario). Interpret as the RELATIVE change across scenarios. Authoritative absolute BER/SQ-SNR: see the 'statistics' block (full split, all segments)."
+  },
+  "threshold_sensitivity": {
+    "note": "IMU percentile-threshold perturbation (Delta=-10/0/+10); state distribution per activity. Activity ordering (walking<sitting<standing LoS) preserved at every Delta.",
+    "results": {
+      "walking": {
+        "-10": {
+          "state_dist": {
+            "0": 0.07719175689835836,
+            "1": 0.27558505064617533,
+            "2": 0.6472231924554663
+          },
+          "markov_matrix": [
+            [
+              0.5339366515837104,
+              0.3574660633484163,
+              0.1085972850678733
+            ],
+            [
+              0.11802030456852793,
+              0.6383248730964467,
+              0.2436548223350254
+            ],
+            [
+              0.004856988667026443,
+              0.1117107393416082,
+              0.8834322719913653
+            ]
+          ],
+          "n_transitions": 604
+        },
+        "0": {
+          "state_dist": {
+            "0": 0.1491442542787286,
+            "1": 0.30178134823611596,
+            "2": 0.5490743974851554
+          },
+          "markov_matrix": [
+            [
+              0.6229508196721312,
+              0.28805620608899296,
+              0.08899297423887588
+            ],
+            [
+              0.15874855156431056,
+              0.6222479721900348,
+              0.2190034762456547
+            ],
+            [
+              0.014631043256997456,
+              0.1297709923664122,
+              0.8555979643765903
+            ]
+          ],
+          "n_transitions": 714
+        },
+        "10": {
+          "state_dist": {
+            "0": 0.23891023402025846,
+            "1": 0.329724065665386,
+            "2": 0.43136570031435556
+          },
+          "markov_matrix": [
+            [
+              0.6910688140556369,
+              0.24597364568081992,
+              0.0629575402635432
+            ],
+            [
+              0.1896186440677966,
+              0.5932203389830508,
+              0.21716101694915255
+            ],
+            [
+              0.025910931174089068,
+              0.1748987854251012,
+              0.7991902834008097
+            ]
+          ],
+          "n_transitions": 843
+        }
+      },
+      "sitting": {
+        "-10": {
+          "state_dist": {
+            "0": 0.16579165515335728,
+            "1": 0.31030671456203374,
+            "2": 0.523901630284609
+          },
+          "markov_matrix": [
+            [
+              0.44908180300500833,
+              0.34390651085141904,
+              0.20701168614357263
+            ],
+            [
+              0.19590382902938558,
+              0.5529830810329475,
+              0.25111308993766696
+            ],
+            [
+              0.0580168776371308,
+              0.15611814345991562,
+              0.7858649789029536
+            ]
+          ],
+          "n_transitions": 1238
+        },
+        "0": {
+          "state_dist": {
+            "0": 0.26775352307267203,
+            "1": 0.3476098369715391,
+            "2": 0.3846366399557889
+          },
+          "markov_matrix": [
+            [
+              0.5754132231404959,
+              0.3006198347107438,
+              0.12396694214876033
+            ],
+            [
+              0.24324324324324326,
+              0.568362480127186,
+              0.18839427662957076
+            ],
+            [
+              0.07543103448275862,
+              0.1810344827586207,
+              0.7435344827586207
+            ]
+          ],
+          "n_transitions": 1311
+        },
+        "10": {
+          "state_dist": {
+            "0": 0.38049184857695495,
+            "1": 0.38878143133462284,
+            "2": 0.2307267200884222
+          },
+          "markov_matrix": [
+            [
+              0.6853197674418605,
+              0.2688953488372093,
+              0.04578488372093023
+            ],
+            [
+              0.26936744847192606,
+              0.6190476190476191,
+              0.11158493248045487
+            ],
+            [
+              0.06467065868263473,
+              0.19880239520958085,
+              0.7365269461077845
+            ]
+          ],
+          "n_transitions": 1189
+        }
+      },
+      "standing": {
+        "-10": {
+          "state_dist": {
+            "0": 0.25609284332688587,
+            "1": 0.3400386847195358,
+            "2": 0.40386847195357833
+          },
+          "markov_matrix": [
+            [
+              0.6042296072507553,
+              0.3217522658610272,
+              0.07401812688821752
+            ],
+            [
+              0.24031890660592256,
+              0.5820045558086561,
+              0.1776765375854214
+            ],
+            [
+              0.04789272030651341,
+              0.14846743295019157,
+              0.803639846743295
+            ]
+          ],
+          "n_transitions": 834
+        },
+        "0": {
+          "state_dist": {
+            "0": 0.37098646034816246,
+            "1": 0.36827852998065763,
+            "2": 0.2607350096711799
+          },
+          "markov_matrix": [
+            [
+              0.6996871741397289,
+              0.2659019812304484,
+              0.03441084462982273
+            ],
+            [
+              0.2754994742376446,
+              0.6182965299684543,
+              0.10620399579390116
+            ],
+            [
+              0.037091988130563795,
+              0.16172106824925817,
+              0.8011869436201781
+            ]
+          ],
+          "n_transitions": 785
+        },
+        "10": {
+          "state_dist": {
+            "0": 0.4912959381044487,
+            "1": 0.3949709864603482,
+            "2": 0.1137330754352031
+          },
+          "markov_matrix": [
+            [
+              0.780929866036249,
+              0.21434200157604413,
+              0.004728132387706856
+            ],
+            [
+              0.2693437806072478,
+              0.6816846229187071,
+              0.04897159647404505
+            ],
+            [
+              0.01020408163265306,
+              0.18027210884353742,
+              0.8095238095238095
+            ]
+          ],
+          "n_transitions": 659
+        }
+      }
+    }
+  }
+}
