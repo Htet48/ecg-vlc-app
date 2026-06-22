@@ -17,7 +17,7 @@ def show_home():
     st.markdown("""
     ## Research Demonstration - Htet@Grace (2026)
 
-    Welcome to the interactive demonstration of my research on **Robust ECG Signal Reconstruction in Dynamic On-Body Visible Light Communication via Advanced Deep Learning** with **motion-aware channel modeling**.
+    Welcome to the interactive demonstration of my research on **Motion-Driven Markov Channel Modeling and Learning-Based Reconstruction for On-Body Optical Wireless ECG Transmission**.
     """)
     
     st.markdown("---")
