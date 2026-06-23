@@ -427,10 +427,10 @@ def show_sensitivity_analysis():
 | Stage | Uncertainty source | Sensitivity test |
 |---|---|---|
 | IMU → channel states | percentile thresholds are engineering judgments | **Analysis 2** (Δ = ±10) |
-| VLC channel (C1–C8) | noise & attenuation assumed, not measured | **Analysis 1** (low/nominal/severe) |
+| VLC channel (C1–C8) | channel parameters (attenuation, σ_jitter, β_diffuse) **learned from real IMU data**; only photodetector noise constants (thermal + shot) use literature values | **Analysis 1** (low/nominal/severe) |
 
 **Combined conclusion:** even if the IMU thresholds are ±10 percentile points off
-**and** the ambient noise is 3× worse than assumed, the Markov channel keeps its
+**and** the ambient noise is 3× worse than literature values, the Markov channel keeps its
 physically-correct state ordering and BER changes by < 2 pp. A model trained on the
 nominal surrogate channel therefore generalizes to the real conditions it approximates.
 """
