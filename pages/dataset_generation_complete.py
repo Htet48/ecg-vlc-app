@@ -628,13 +628,12 @@ Both metrics important:
             "An earlier version double-counted the conjugate-mirror subcarriers, producing "
             "an artificial ≈ 25% BER floor. The deep learning models reconstruct the ECG "
             "from this distorted signal without equalization. "
-            "*(Reviewer 3, Comments #1 & #3)*"
         )
         st.caption(
             "Three scenarios perturb the effective attenuation, jitter, and diffuse weights "
             "to emulate low, nominal, and severe ambient-light/occlusion conditions. "
             "Each scenario should produce a meaningfully different BER, showing robustness "
-            "of the surrogate channel model (Reviewer 1 C#1,2 / Reviewer 2 C#4,5)."
+            "of the surrogate channel model."
         )
         st.success(
             "**What this table is for — the Ambient Robustness Scan.** "
