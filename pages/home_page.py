@@ -77,7 +77,7 @@ A3. ACO-OFDM (Odd subcarriers + IFFT + Cyclic Prefix)
 • Load real IMU data (accelerometer + gyroscope)
 • Physics-based processing (EMA, Rolling Std)   
 • Learn transition matrix P from motion patterns
-• Generate state sequence: a[t] ∈ {LoS, Partial, NLoS}  
+• Generate state sequence: a[t] ∈ {LoS-dominant, partially obstructed, and diffuse-dominant}  
                          ↓
    STAGE C: VLC CHANNEL EFFECTS (8 SUB-STAGES)
 C1. State-Dependent Attenuation g(aₜ)  ← Learned from IMU
@@ -159,12 +159,12 @@ Deep Learning:
         ### 📈 Expected Results
         
         **Channel Parameters (Learned from IMU):**
-        - Walking: Higher jitter (σ≈0.12), more transitions
-        - Sitting: Medium stability (σ≈0.08)
-        - Standing: Very stable (σ≈0.05), mostly LoS
+        - Walking: Higher jitter (σ≈0.148), more transitions
+        - Sitting: Medium stability (σ≈0.057)
+        - Standing: Very stable (σ≈0.062), mostly LoS
         
         **BER Performance:**
-        - Realistic: ~25% (with noise reduction)
+        - Realistic: ~6.8% (with noise reduction)
         - Activity-dependent: Walking > Sitting > Standing
         
         **Reconstruction:**
