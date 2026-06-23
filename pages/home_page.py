@@ -66,43 +66,47 @@ def show_home():
              ECG SIGNAL SOURCE
 MIT-BIH Database → 1080 samples (3 sec × 360 Hz)
                          ↓
-   STAGE A: ACO-OFDM MODULATION        
-A1. ECG → 8-bit Quantization       
-A2. Bits → QAM Symbols (4-QAM)         
-A3. ACO-OFDM (Odd subcarriers + IFFT + Cyclic Prefix)
+   STAGE A: ACO-OFDM MODULATION
+A1. ECG → 8-bit Quantization
+A2. Bits → QAM Symbols (4-QAM)
+A3. ACO-OFDM: Hermitian symmetry on N/4 odd subcarriers + IFFT + Cyclic Prefix
+    [CORRECTED: N/4 = 64 independent subcarriers, not N/2]
                          ↓
                 s(t) [OFDM Signal]
                          ↓
    STAGE B: MARKOV STATE GENERATION (IMU-LEARNED)
-• Load real IMU data (accelerometer + gyroscope)
-• Physics-based processing (EMA, Rolling Std)   
+• Load real IMU data (accelerometer + gyroscope, 50 Hz)
+• Physics-based processing (EMA gravity removal, Rolling Std)
 • Learn transition matrix P from motion patterns
-• Generate state sequence: a[t] ∈ {LoS-dominant, partially obstructed, and diffuse-dominant}  
+• Generate state sequence: a[t] ∈ {LoS-dominant, Partially-obstructed, Diffuse-dominant}
+• State weights: η_dir = [0.95, 0.60, 0.20]  η_diff = [0.05, 0.40, 0.80]
                          ↓
    STAGE C: VLC CHANNEL EFFECTS (8 SUB-STAGES)
-C1. State-Dependent Attenuation g(aₜ)  ← Learned from IMU
-C2. Log-Normal Jitter ξ(t)             ← Learned from IMU
-C3. Lambertian Channel H₀(t)           ← Physics model
-C4. Direct Path Combination        
-C5. Diffuse Path h_diff(t)             ← Learned from IMU
-C6. Signal Combination (Direct + Diffuse)       
-C7. LED Nonlinearity & Clipping   
-C8. Noise Addition (Thermal + Shot)             
+C1. State-Dependent Attenuation g(aₜ)       ← Learned from IMU
+C2. Log-Normal Jitter ξ(t)                  ← Learned from IMU
+C3. Lambertian Channel H₀(t)                ← Physics model
+C4. Direct Path:  H₀ · g(aₜ) · ξ(t) · s(t)
+C5. Diffuse Path: β · h_eff(t) * s(t)       ← τ_eff=15ms memory constant
+C6. State-Dependent Combination:
+    r_combined = η_dir[aₜ] · direct + η_diff[aₜ] · diffuse
+C7. LED Nonlinearity: a₁·x + a₃·x³ (a₃=-0.02, compression) + clip[0, Pmax]
+C8. Noise Addition (Thermal + Shot noise)
                           ↓
                 r(t) [Received Signal]
                           ↓
-    STAGE D: ACO-OFDM DEMODULATION & BER     
-• Remove Cyclic Prefix             
-• FFT & Extract Odd Subcarriers   
-• QAM De-mapping → Bits            
-• Bits → Reconstructed ECG         
-• Calculate Bit Error Rate (BER)  
+    STAGE D: ACO-OFDM DEMODULATION & RAW BER
+• Remove Cyclic Prefix
+• FFT & Extract N/4 Odd Subcarriers
+• QAM De-mapping → Bits
+• Bits → Reconstructed ECG
+• Calculate Raw/Uncoded BER (no FEC, no equalization)
                           ↓
     STAGE E: SIGNAL RECONSTRUCTION
-Classical Methods:                 
-  • Interpolation(1), Wavelet(2), OFDM Mitigation(3) and Combined(1+2+3). 
-Deep Learning:                     
-  • CNN-BiLSTM (trained on degraded signals)  
+Classical Methods:
+  • Interpolation(1), Wavelet(2), OFDM Mitigation(3), Combined(1+2+3)
+Deep Learning (trained on degraded signals, no equalization):
+  • CNN-BiLSTM    • CNN-LSTM
+  • CNN-GRU       • Transformer+CNN
     """
     
     st.code(pipeline_text, language='text')
