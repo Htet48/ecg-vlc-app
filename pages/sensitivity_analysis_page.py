@@ -105,7 +105,7 @@ def _compute_threshold_sensitivity_live():
 def show_sensitivity_analysis():
     st.title("🔬 Sensitivity Analysis")
     st.markdown(
-        "Two robustness analyses requested by the reviewers, demonstrating that the "
+        "Two robustness analyses demonstrate that the "
         "corrected pilot VLC channel is **robust to both ambient-noise and "
         "IMU-threshold uncertainty** — the core of the simulation-to-reality argument."
     )
